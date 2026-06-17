@@ -1,1 +1,145 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://raw.githubusercontent.com/tooppoo/testography/main/schemas/testography-assessment-layer/testography-assessment-layer.v0.json","title":"Testography Assessment Layer v0","type":"object","required":["schema_version","id","producer","assessments"],"additionalProperties":false,"properties":{"schema_version":{"type":"string","pattern":"^(v0|0(\\.\\d+\\.\\d+)?)$"},"id":{"type":"string","minLength":1},"producer":{"type":"object","required":["name","version","kind"],"additionalProperties":true,"properties":{"name":{"type":"string"},"version":{"type":"string"},"kind":{"enum":["static","llm","project","generic","language","framework","unknown"]}}},"assessments":{"type":"array","items":{"$ref":"#/$defs/assessment"}},"diagnostics":{"type":"array","items":{"type":"object","additionalProperties":true}},"extensions":{"type":"object","additionalProperties":true}},"$defs":{"assessment":{"type":"object","required":["id","kind","statement"],"additionalProperties":false,"properties":{"id":{"type":"string"},"kind":{"enum":["static_rule_match","candidate_finding","mechanical_finding","domain_assessment","llm_interpretation","llm_assessment","recommendation","diagnostic_note"]},"category":{"type":"string"},"rule_id":{"type":"string"},"status":{"type":"string"},"severity":{"enum":["info","warning","error","critical"]},"statement":{"type":"string","minLength":1},"evidence_refs":{"type":"array","items":{"type":"string"}},"assessment_refs":{"type":"array","items":{"type":"string"}},"confidence":{"enum":["high","medium","low","unknown"]},"data":{"type":"object","additionalProperties":true},"extensions":{"type":"object","additionalProperties":true}}}}}
+{
+        "$id": "https://raw.githubusercontent.com/tooppoo/testography/main/schemas/testography-assessment-layer/testography-assessment-layer.v0.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+        "assessments": {
+            "items": {
+                "$ref": "#/$defs/assessment"
+            },
+            "type": "array"
+        },
+        "diagnostics": {
+            "items": {
+                "additionalProperties": true,
+                "type": "object"
+            },
+            "type": "array"
+        },
+        "extensions": {
+            "additionalProperties": true,
+            "type": "object"
+        },
+        "id": {
+            "minLength": 1,
+            "type": "string"
+        },
+        "producer": {
+            "additionalProperties": true,
+            "properties": {
+                "kind": {
+                    "enum": [
+                        "static",
+                        "llm",
+                        "project",
+                        "generic",
+                        "language",
+                        "framework",
+                        "unknown"
+                    ]
+                },
+                "name": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name",
+                "version",
+                "kind"
+            ],
+            "type": "object"
+        },
+        "schema_version": {
+            "pattern": "^(v0|0(\\.\\d+\\.\\d+)?)$",
+            "type": "string"
+        }
+    },
+    "required": [
+        "schema_version",
+        "id",
+        "producer",
+        "assessments"
+    ],
+    "title": "Testography Assessment Layer v0",
+    "type": "object",
+    "$defs": {
+        "assessment": {
+            "additionalProperties": false,
+            "properties": {
+                "assessment_refs": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "category": {
+                    "type": "string"
+                },
+                "confidence": {
+                    "enum": [
+                        "high",
+                        "medium",
+                        "low",
+                        "unknown"
+                    ]
+                },
+                "data": {
+                    "additionalProperties": true,
+                    "type": "object"
+                },
+                "evidence_refs": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "extensions": {
+                    "additionalProperties": true,
+                    "type": "object"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "enum": [
+                        "static_rule_match",
+                        "candidate_finding",
+                        "mechanical_finding",
+                        "domain_assessment",
+                        "llm_interpretation",
+                        "llm_assessment",
+                        "recommendation",
+                        "diagnostic_note"
+                    ]
+                },
+                "rule_id": {
+                    "type": "string"
+                },
+                "severity": {
+                    "enum": [
+                        "info",
+                        "warning",
+                        "error",
+                        "critical"
+                    ]
+                },
+                "statement": {
+                    "minLength": 1,
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "id",
+                "kind",
+                "statement"
+            ],
+            "type": "object"
+        }
+    }
+}

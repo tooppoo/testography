@@ -1,1 +1,50 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://raw.githubusercontent.com/tooppoo/testography/main/schemas/testography-assessed-artifact/testography-assessed-artifact.v0.json","title":"Testography Assessed Artifact v0","type":"object","required":["schema_version","artifact_type","producer","evidence","assessment_layers"],"additionalProperties":false,"properties":{"schema_version":{"type":"string","pattern":"^(v0|0(\\.\\d+\\.\\d+)?)$"},"artifact_type":{"const":"assessed_artifact"},"producer":{"$ref":"../testography-evidence/testography-evidence.v0.json#/$defs/producer"},"project":{"type":"object","additionalProperties":true},"evidence":{"$ref":"../testography-evidence/testography-evidence.v0.json#/$defs/evidence"},"assessment_layers":{"type":"array","items":{"$ref":"../testography-assessment-layer/testography-assessment-layer.v0.json"}},"diagnostics":{"type":"array","items":{"type":"object","additionalProperties":true}},"extensions":{"type":"object","additionalProperties":true}}}
+{
+    "$id": "https://raw.githubusercontent.com/tooppoo/testography/main/schemas/testography-assessed-artifact/testography-assessed-artifact.v0.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "required": [
+        "schema_version",
+        "artifact_type",
+        "producer",
+        "evidence",
+        "assessment_layers"
+    ],
+    "title": "Testography Assessed Artifact v0",
+    "type": "object",
+    "properties": {
+        "artifact_type": {
+            "const": "assessed_artifact"
+        },
+        "assessment_layers": {
+            "items": {
+                "$ref": "../testography-assessment-layer/testography-assessment-layer.v0.json"
+            },
+            "type": "array"
+        },
+        "diagnostics": {
+            "items": {
+                "additionalProperties": true,
+                "type": "object"
+            },
+            "type": "array"
+        },
+        "evidence": {
+            "$ref": "../testography-evidence/testography-evidence.v0.json#/$defs/evidence"
+        },
+        "extensions": {
+            "additionalProperties": true,
+            "type": "object"
+        },
+        "producer": {
+            "$ref": "../testography-evidence/testography-evidence.v0.json#/$defs/producer"
+        },
+        "project": {
+            "additionalProperties": true,
+            "type": "object"
+        },
+        "schema_version": {
+            "pattern": "^(v0|0(\\.\\d+\\.\\d+)?)$",
+            "type": "string"
+        }
+    }
+}

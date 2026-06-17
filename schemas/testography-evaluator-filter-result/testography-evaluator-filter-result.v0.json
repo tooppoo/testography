@@ -1,1 +1,243 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://raw.githubusercontent.com/tooppoo/testography/main/schemas/testography-evaluator-filter-result/testography-evaluator-filter-result.v0.json","title":"Testography Evaluator Filter Result v0","oneOf":[{"$ref":"#/$defs/ok_result"},{"$ref":"#/$defs/error_result"}],"$defs":{"schema_version":{"type":"string","pattern":"^(v0|0(\\.\\d+\\.\\d+)?)$"},"ref":{"type":"string","minLength":1},"unexpected":{"type":"object","required":["ref","reason"],"additionalProperties":true,"properties":{"ref":{"$ref":"#/$defs/ref"},"reason":{"enum":["unsupported_language","unsupported_framework","unsupported_evidence_kind","missing_optional_field","not_selected","other"]},"message":{"type":"string"},"actual":{},"expected":{}}},"applicability":{"oneOf":[{"type":"object","required":["status","accepted_refs"],"additionalProperties":false,"properties":{"status":{"const":"applicable"},"accepted_refs":{"type":"array","items":{"$ref":"#/$defs/ref"}},"diagnostics":{"type":"array","items":{"type":"object","additionalProperties":true}},"extensions":{"type":"object","additionalProperties":true}}},{"type":"object","required":["status","accepted_refs","unexpected_refs"],"additionalProperties":false,"properties":{"status":{"const":"partial"},"accepted_refs":{"type":"array","items":{"$ref":"#/$defs/ref"}},"unexpected_refs":{"type":"array","items":{"$ref":"#/$defs/ref"}},"unexpected":{"type":"array","items":{"$ref":"#/$defs/unexpected"}},"diagnostics":{"type":"array","items":{"type":"object","additionalProperties":true}},"extensions":{"type":"object","additionalProperties":true}}},{"type":"object","required":["status","unexpected_refs"],"additionalProperties":false,"properties":{"status":{"const":"not_applicable"},"unexpected_refs":{"type":"array","items":{"$ref":"#/$defs/ref"}},"unexpected":{"type":"array","items":{"$ref":"#/$defs/unexpected"}},"reason":{"type":"string"},"diagnostics":{"type":"array","items":{"type":"object","additionalProperties":true}},"extensions":{"type":"object","additionalProperties":true}}}]},"ok_result":{"type":"object","required":["schema_version","ok","value"],"additionalProperties":false,"properties":{"schema_version":{"$ref":"#/$defs/schema_version"},"ok":{"const":true},"value":{"$ref":"#/$defs/applicability"}}},"error_result":{"type":"object","required":["schema_version","ok","error"],"additionalProperties":false,"properties":{"schema_version":{"$ref":"#/$defs/schema_version"},"ok":{"const":false},"error":{"type":"object","required":["code","message"],"additionalProperties":false,"properties":{"code":{"enum":["invalid_artifact","schema_mismatch","missing_required_field","internal_error"]},"message":{"type":"string","minLength":1},"refs":{"type":"array","items":{"$ref":"#/$defs/ref"}},"diagnostics":{"type":"array","items":{"type":"object","additionalProperties":true}},"extensions":{"type":"object","additionalProperties":true}}}}}}}
+{
+        "$id": "https://raw.githubusercontent.com/tooppoo/testography/main/schemas/testography-evaluator-filter-result/testography-evaluator-filter-result.v0.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "oneOf": [
+        {
+            "$ref": "#/$defs/ok_result"
+        },
+        {
+            "$ref": "#/$defs/error_result"
+        }
+    ],
+    "title": "Testography Evaluator Filter Result v0",
+    "$defs": {
+        "applicability": {
+            "oneOf": [
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "accepted_refs": {
+                            "items": {
+                                "$ref": "#/$defs/ref"
+                            },
+                            "type": "array"
+                        },
+                        "diagnostics": {
+                            "items": {
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            "type": "array"
+                        },
+                        "extensions": {
+                            "additionalProperties": true,
+                            "type": "object"
+                        },
+                        "status": {
+                            "const": "applicable"
+                        }
+                    },
+                    "required": [
+                        "status",
+                        "accepted_refs"
+                    ],
+                    "type": "object"
+                },
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "accepted_refs": {
+                            "items": {
+                                "$ref": "#/$defs/ref"
+                            },
+                            "type": "array"
+                        },
+                        "diagnostics": {
+                            "items": {
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            "type": "array"
+                        },
+                        "extensions": {
+                            "additionalProperties": true,
+                            "type": "object"
+                        },
+                        "status": {
+                            "const": "partial"
+                        },
+                        "unexpected": {
+                            "items": {
+                                "$ref": "#/$defs/unexpected"
+                            },
+                            "type": "array"
+                        },
+                        "unexpected_refs": {
+                            "items": {
+                                "$ref": "#/$defs/ref"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "required": [
+                        "status",
+                        "accepted_refs",
+                        "unexpected_refs"
+                    ],
+                    "type": "object"
+                },
+                {
+                    "additionalProperties": false,
+                    "properties": {
+                        "diagnostics": {
+                            "items": {
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            "type": "array"
+                        },
+                        "extensions": {
+                            "additionalProperties": true,
+                            "type": "object"
+                        },
+                        "reason": {
+                            "type": "string"
+                        },
+                        "status": {
+                            "const": "not_applicable"
+                        },
+                        "unexpected": {
+                            "items": {
+                                "$ref": "#/$defs/unexpected"
+                            },
+                            "type": "array"
+                        },
+                        "unexpected_refs": {
+                            "items": {
+                                "$ref": "#/$defs/ref"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "required": [
+                        "status",
+                        "unexpected_refs"
+                    ],
+                    "type": "object"
+                }
+            ]
+        },
+        "error_result": {
+            "additionalProperties": false,
+            "properties": {
+                "error": {
+                    "additionalProperties": false,
+                    "properties": {
+                        "code": {
+                            "enum": [
+                                "invalid_artifact",
+                                "schema_mismatch",
+                                "missing_required_field",
+                                "internal_error"
+                            ]
+                        },
+                        "diagnostics": {
+                            "items": {
+                                "additionalProperties": true,
+                                "type": "object"
+                            },
+                            "type": "array"
+                        },
+                        "extensions": {
+                            "additionalProperties": true,
+                            "type": "object"
+                        },
+                        "message": {
+                            "minLength": 1,
+                            "type": "string"
+                        },
+                        "refs": {
+                            "items": {
+                                "$ref": "#/$defs/ref"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "required": [
+                        "code",
+                        "message"
+                    ],
+                    "type": "object"
+                },
+                "ok": {
+                    "const": false
+                },
+                "schema_version": {
+                    "$ref": "#/$defs/schema_version"
+                }
+            },
+            "required": [
+                "schema_version",
+                "ok",
+                "error"
+            ],
+            "type": "object"
+        },
+        "ok_result": {
+            "additionalProperties": false,
+            "properties": {
+                "ok": {
+                    "const": true
+                },
+                "schema_version": {
+                    "$ref": "#/$defs/schema_version"
+                },
+                "value": {
+                    "$ref": "#/$defs/applicability"
+                }
+            },
+            "required": [
+                "schema_version",
+                "ok",
+                "value"
+            ],
+            "type": "object"
+        },
+        "ref": {
+            "minLength": 1,
+            "type": "string"
+        },
+        "schema_version": {
+            "pattern": "^(v0|0(\\.\\d+\\.\\d+)?)$",
+            "type": "string"
+        },
+        "unexpected": {
+            "additionalProperties": true,
+            "properties": {
+                "actual": {},
+                "expected": {},
+                "message": {
+                    "type": "string"
+                },
+                "reason": {
+                    "enum": [
+                        "unsupported_language",
+                        "unsupported_framework",
+                        "unsupported_evidence_kind",
+                        "missing_optional_field",
+                        "not_selected",
+                        "other"
+                    ]
+                },
+                "ref": {
+                    "$ref": "#/$defs/ref"
+                }
+            },
+            "required": [
+                "ref",
+                "reason"
+            ],
+            "type": "object"
+        }
+    }
+}
