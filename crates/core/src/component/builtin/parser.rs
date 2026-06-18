@@ -1,8 +1,8 @@
+use crate::artifact::EvidenceArtifact;
 use crate::artifact::common::Producer;
 use crate::artifact::evidence::Evidence;
-use crate::artifact::EvidenceArtifact;
-use crate::component::parser::{Parser, ParserInput};
 use crate::component::ComponentResult;
+use crate::component::parser::{Parser, ParserInput};
 use crate::validation::ACCEPTED_SCHEMA_VERSION;
 
 pub struct BuiltinParser;

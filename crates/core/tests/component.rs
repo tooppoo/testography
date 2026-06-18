@@ -1,6 +1,8 @@
 use tgraphy_core::component::builtin::{BuiltinEvaluator, BuiltinParser, BuiltinReporter};
 use tgraphy_core::component::parser::ParserInput;
-use tgraphy_core::component::process::{ProcessConfig, ProcessEvaluator, ProcessParser, ProcessReporter};
+use tgraphy_core::component::process::{
+    ProcessConfig, ProcessEvaluator, ProcessParser, ProcessReporter,
+};
 use tgraphy_core::component::{ComponentError, ComponentRegistry};
 use tgraphy_core::{ArtifactError, ComponentResult};
 

@@ -1,5 +1,5 @@
-use crate::component::reporter::{ReportOutput, Reporter, ReporterInput};
 use crate::component::ComponentResult;
+use crate::component::reporter::{ReportOutput, Reporter, ReporterInput};
 
 pub struct BuiltinReporter;
 

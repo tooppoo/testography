@@ -1,6 +1,6 @@
 use crate::artifact::layer::{AssessmentLayer, LayerProducer, LayerProducerKind};
-use crate::component::evaluator::{Evaluator, EvaluatorInput};
 use crate::component::ComponentResult;
+use crate::component::evaluator::{Evaluator, EvaluatorInput};
 use crate::validation::ACCEPTED_SCHEMA_VERSION;
 
 pub struct BuiltinEvaluator;

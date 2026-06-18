@@ -33,12 +33,11 @@ impl ComponentRegistry {
     }
 
     pub fn resolve_parser(&self, name: &str) -> ComponentResult<&dyn Parser> {
-        self.parsers
-            .get(name)
-            .map(|p| p.as_ref())
-            .ok_or_else(|| ComponentError::UnsupportedComponent {
+        self.parsers.get(name).map(|p| p.as_ref()).ok_or_else(|| {
+            ComponentError::UnsupportedComponent {
                 message: format!("no parser registered with name {name:?}"),
-            })
+            }
+        })
     }
 
     pub fn resolve_evaluator(&self, name: &str) -> ComponentResult<&dyn Evaluator> {
@@ -51,12 +50,11 @@ impl ComponentRegistry {
     }
 
     pub fn resolve_reporter(&self, name: &str) -> ComponentResult<&dyn Reporter> {
-        self.reporters
-            .get(name)
-            .map(|r| r.as_ref())
-            .ok_or_else(|| ComponentError::UnsupportedComponent {
+        self.reporters.get(name).map(|r| r.as_ref()).ok_or_else(|| {
+            ComponentError::UnsupportedComponent {
                 message: format!("no reporter registered with name {name:?}"),
-            })
+            }
+        })
     }
 }
 
