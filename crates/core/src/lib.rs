@@ -1,8 +1,10 @@
 pub mod artifact;
+pub mod component;
 pub mod io;
 pub mod validation;
 
 pub use artifact::{ArtifactKind, AssessedArtifact, EvidenceArtifact};
+pub use component::{ComponentError, ComponentRegistry, ComponentResult};
 pub use validation::{ArtifactError, ReferenceViolation, SchemaViolation};
 
 use validation::integrity::{check_assessed_integrity, check_evidence_integrity};
