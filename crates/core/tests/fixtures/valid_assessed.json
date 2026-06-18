@@ -1,0 +1,65 @@
+{
+    "schema_version": "0.0.1",
+    "artifact_type": "assessed_artifact",
+    "producer": {
+        "name": "vitest-static",
+        "version": "0.1.0"
+    },
+    "evidence": {
+        "test_cases": [
+            {
+                "id": "test-001",
+                "name": "rejects empty name",
+                "source": {
+                    "file": "tests/user.test.ts",
+                    "line": 12
+                },
+                "calls": [
+                    {
+                        "id": "call-001",
+                        "role": "assertion_target_call",
+                        "callee": {
+                            "text": "createUser",
+                            "resolution_status": "resolved"
+                        }
+                    }
+                ],
+                "assertions": [
+                    {
+                        "id": "assertion-001",
+                        "style": "expect_matcher",
+                        "target_call_refs": ["call-001"]
+                    }
+                ]
+            }
+        ],
+        "modules": [
+            {
+                "id": "symbol:src/user/createUser.ts#createUser",
+                "kind": "symbol"
+            }
+        ]
+    },
+    "assessment_layers": [
+        {
+            "schema_version": "0.0.1",
+            "id": "layer-vitest-static-001",
+            "producer": {
+                "name": "vitest-static",
+                "version": "0.1.0",
+                "kind": "static"
+            },
+            "assessments": [
+                {
+                    "id": "assessment-001",
+                    "kind": "static_rule_match",
+                    "rule_id": "vitest.toThrow.no_expected_argument",
+                    "statement": "toThrow is used without an expected error argument.",
+                    "evidence_refs": ["assertion-001"],
+                    "confidence": "high",
+                    "severity": "warning"
+                }
+            ]
+        }
+    ]
+}
