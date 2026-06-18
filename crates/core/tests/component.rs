@@ -1,10 +1,12 @@
 use tgraphy_core::component::builtin::{BuiltinEvaluator, BuiltinParser, BuiltinReporter};
+use tgraphy_core::component::evaluator::{Evaluator, EvaluatorInput};
 use tgraphy_core::component::parser::ParserInput;
 use tgraphy_core::component::process::{
     ProcessConfig, ProcessEvaluator, ProcessParser, ProcessReporter,
 };
+use tgraphy_core::component::reporter::{Reporter, ReporterInput};
 use tgraphy_core::component::{ComponentError, ComponentRegistry};
-use tgraphy_core::{ArtifactError, ComponentResult};
+use tgraphy_core::{ArtifactError, ArtifactKind, ComponentResult};
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -19,6 +21,22 @@ fn process_config(command: &str) -> ProcessConfig {
     ProcessConfig {
         command: command.to_string(),
         args: vec![],
+    }
+}
+
+fn minimal_evidence() -> tgraphy_core::EvidenceArtifact {
+    let json = r#"{"schema_version":"0.0.1","artifact_type":"evidence","producer":{"name":"x","version":"0.1.0"},"evidence":{}}"#;
+    match tgraphy_core::parse_artifact(json).unwrap() {
+        ArtifactKind::Evidence(a) => a,
+        _ => panic!("expected evidence"),
+    }
+}
+
+fn minimal_assessed() -> tgraphy_core::AssessedArtifact {
+    let json = r#"{"schema_version":"0.0.1","artifact_type":"assessed_artifact","producer":{"name":"x","version":"0.1.0"},"evidence":{},"assessment_layers":[]}"#;
+    match tgraphy_core::parse_artifact(json).unwrap() {
+        ArtifactKind::Assessed(a) => a,
+        _ => panic!("expected assessed"),
     }
 }
 
@@ -168,5 +186,41 @@ fn process_parser_returns_structured_failure() {
     assert!(
         matches!(result, Err(ComponentError::InternalError { .. })),
         "process parser should return InternalError before execution is implemented"
+    );
+}
+
+#[test]
+fn process_evaluator_returns_structured_failure() {
+    let evaluator = ProcessEvaluator {
+        config: process_config("nonexistent-command"),
+    };
+    let result = Evaluator::evaluate(
+        &evaluator,
+        EvaluatorInput {
+            artifact: minimal_evidence(),
+            config: None,
+        },
+    );
+    assert!(
+        matches!(result, Err(ComponentError::InternalError { .. })),
+        "process evaluator should return InternalError before execution is implemented"
+    );
+}
+
+#[test]
+fn process_reporter_returns_structured_failure() {
+    let reporter = ProcessReporter {
+        config: process_config("nonexistent-command"),
+    };
+    let result = Reporter::report(
+        &reporter,
+        ReporterInput {
+            artifact: minimal_assessed(),
+            config: None,
+        },
+    );
+    assert!(
+        matches!(result, Err(ComponentError::InternalError { .. })),
+        "process reporter should return InternalError before execution is implemented"
     );
 }

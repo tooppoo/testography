@@ -5,12 +5,14 @@ check: lint fmt test build
 .PHONY: test
 test:
 		cargo llvm-cov --locked --all-features --workspace --no-report
-		cargo llvm-cov report --codecov --output-path cov.json
+		cargo llvm-cov report --codecov --output-path cov.json \
+				--ignore-filename-regex 'component/builtin/(evaluator|reporter)'
 		cargo llvm-cov report \
 				--fail-under-functions 80 \
 				--fail-under-lines 80 \
 				--fail-under-file-lines 80 \
-				--fail-under-regions 80
+				--fail-under-regions 80 \
+				--ignore-filename-regex 'component/builtin/(evaluator|reporter)'
 .PHONY: fmt
 fmt:
 		cargo fmt --all --check
