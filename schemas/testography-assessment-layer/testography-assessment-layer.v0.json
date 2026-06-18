@@ -1,5 +1,5 @@
 {
-        "$id": "https://raw.githubusercontent.com/tooppoo/testography/main/schemas/testography-assessment-layer/testography-assessment-layer.v0.json",
+    "$id": "https://raw.githubusercontent.com/tooppoo/testography/main/schemas/testography-assessment-layer/testography-assessment-layer.v0.json",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "additionalProperties": false,
     "properties": {
