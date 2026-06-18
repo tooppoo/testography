@@ -1,5 +1,8 @@
 # build
 /target
 
+# test
+cov.json
+
 # local
 *.local.json
