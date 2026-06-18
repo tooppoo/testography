@@ -1,7 +1,6 @@
 
 .PHONY: check
-check: fmt test build
-		cargo clippy --all-targets --locked -- -D warnings
+check: lint fmt test build
 
 .PHONY: test
 test:
@@ -12,6 +11,11 @@ test:
 .PHONY: fmt
 fmt:
 		cargo fmt --all --check
+
+.PHONY: lint
+lint:
+		cargo clippy --all-targets --locked -- -D warnings
+
 
 .PHONY: setup
 setup:
