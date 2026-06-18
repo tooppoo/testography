@@ -27,10 +27,6 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-llvm-cov@0.8.7
-
       - name: Setup
         run: make setup
 

@@ -15,7 +15,8 @@ fmt:
 
 .PHONY: setup
 setup:
-		rustup component add rustfmt clippy
+		cargo install cargo-llvm-cov@0.8.7
+		rustup component add rustfmt clippy llvm-tools-preview
 
 .PHONY: build
 build:
