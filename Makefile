@@ -4,7 +4,6 @@ check: lint fmt test build
 
 .PHONY: test
 test:
-		cargo llvm-cov clean --workspace
 		cargo llvm-cov --locked --all-features --workspace --no-report
 		cargo llvm-cov report --codecov --output-path cov.json
 		cargo llvm-cov report
