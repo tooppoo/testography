@@ -1,5 +1,9 @@
 # Testography
 
+[![CI](https://github.com/tooppoo/testography/actions/workflows/ci.yml/badge.svg)](https://github.com/tooppoo/testography/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![codecov](https://codecov.io/gh/tooppoo/testography/graph/badge.svg?token=p9fOOv3NIz)](https://codecov.io/gh/tooppoo/testography)
+
 Static evidence maps for test code.
 
 Testography is a language-neutral test analysis pipeline. It parses test code into structured evidence, groups that evidence by target module, lets pluggable evaluators add assessment layers, and keeps reporting as an independent output layer.
