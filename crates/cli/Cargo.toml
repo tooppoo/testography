@@ -1,0 +1,12 @@
+[package]
+name = "tgraphy"
+version = "0.0.1"
+edition = "2024"
+
+[[bin]]
+name = "tgraphy"
+path = "src/main.rs"
+
+[dependencies]
+tgraphy-core = { path = "../core" }
+clap = { version = "4", features = ["derive"] }
