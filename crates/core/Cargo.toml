@@ -10,3 +10,4 @@ jsonschema = "0.26"
 thiserror = "1"
 
 [dev-dependencies]
+cargo-llvm-cov = "0.8.7"

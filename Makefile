@@ -1,14 +1,17 @@
 
 .PHONY: check
-check:
-		cargo fmt --all --check
+check: fmt test build
 		cargo clippy --all-targets --locked -- -D warnings
-		cargo test --locked
-		cargo build --locked
+
+.PHONY: test
+test:
+		cargo test --locked --all-features --workspace
+		cargo llvm-cov report --codecov --output-path cov.json
+		cargo llvm-cov report
 
 .PHONY: fmt
 fmt:
-		cargo fmt --all
+		cargo fmt --all --check
 
 .PHONY: setup
 setup:
