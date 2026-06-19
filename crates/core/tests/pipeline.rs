@@ -124,10 +124,10 @@ fn collect_fails_with_component_error_for_unsupported_parser() {
         matches!(
             result,
             Err(PipelineError::Component(
-                ComponentError::UnsupportedComponent { .. }
+                ComponentError::NotFoundComponent { .. }
             ))
         ),
-        "unknown parser should produce Component(UnsupportedComponent): {:?}",
+        "unknown parser should produce Component(NotFoundComponent): {:?}",
         result
     );
 }
@@ -304,10 +304,10 @@ fn evaluate_fails_with_component_error_for_unsupported_evaluator() {
         matches!(
             result,
             Err(PipelineError::Component(
-                ComponentError::UnsupportedComponent { .. }
+                ComponentError::NotFoundComponent { .. }
             ))
         ),
-        "unknown evaluator should produce Component(UnsupportedComponent): {:?}",
+        "unknown evaluator should produce Component(NotFoundComponent): {:?}",
         result
     );
 }
@@ -417,10 +417,10 @@ fn report_fails_with_component_error_for_unsupported_reporter() {
         matches!(
             result,
             Err(PipelineError::Component(
-                ComponentError::UnsupportedComponent { .. }
+                ComponentError::NotFoundComponent { .. }
             ))
         ),
-        "unknown reporter should produce Component(UnsupportedComponent): {:?}",
+        "unknown reporter should produce Component(NotFoundComponent): {:?}",
         result
     );
 }
@@ -452,6 +452,36 @@ fn report_overwrites_existing_output() {
     let _ = std::fs::remove_file(&output);
 }
 
+// ── end-to-end: collect → evaluate → report ───────────────────────────────────
+
+#[test]
+fn collect_evaluate_report_end_to_end() {
+    let registry = builtin_registry();
+    let source = fixture("valid_evidence.json");
+    let evidence_out = temp_path("e2e_evidence.json");
+    let assessed_out = temp_path("e2e_assessed.json");
+    let report_out = temp_path("e2e_report.txt");
+
+    collect_step(&registry, "builtin", &source, &evidence_out).expect("collect should succeed");
+
+    let evidence = tgraphy_core::io::read_artifact(&evidence_out).unwrap();
+    assert!(matches!(evidence, ArtifactKind::Evidence(_)));
+
+    evaluate_step(&registry, "builtin", &evidence_out, &assessed_out)
+        .expect("evaluate should succeed");
+
+    let assessed = tgraphy_core::io::read_artifact(&assessed_out).unwrap();
+    assert!(matches!(assessed, ArtifactKind::Assessed(_)));
+
+    report_step(&registry, "builtin", &assessed_out, &report_out).expect("report should succeed");
+
+    assert!(report_out.exists(), "report output file should exist");
+
+    let _ = std::fs::remove_file(&evidence_out);
+    let _ = std::fs::remove_file(&assessed_out);
+    let _ = std::fs::remove_file(&report_out);
+}
+
 // ── error category distinction ────────────────────────────────────────────────
 
 #[test]
@@ -464,7 +494,7 @@ fn pipeline_errors_are_distinct_types() {
         PipelineError::ArtifactValidation(tgraphy_core::ArtifactError::UnknownArtifactType {
             found: "x".to_string(),
         });
-    let component_err = PipelineError::Component(ComponentError::UnsupportedComponent {
+    let component_err = PipelineError::Component(ComponentError::NotFoundComponent {
         message: "no such component".to_string(),
     });
 

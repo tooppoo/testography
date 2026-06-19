@@ -129,8 +129,8 @@ fn resolving_unknown_parser_name_returns_error() {
     let registry = ComponentRegistry::new();
     let result = registry.resolve_parser("nonexistent");
     assert!(
-        matches!(result, Err(ComponentError::UnsupportedComponent { .. })),
-        "unknown parser name should return UnsupportedComponent error"
+        matches!(result, Err(ComponentError::NotFoundComponent { .. })),
+        "unknown parser name should return NotFoundComponent error"
     );
 }
 
@@ -139,8 +139,8 @@ fn resolving_unknown_evaluator_name_returns_error() {
     let registry = ComponentRegistry::new();
     let result = registry.resolve_evaluator("nonexistent");
     assert!(
-        matches!(result, Err(ComponentError::UnsupportedComponent { .. })),
-        "unknown evaluator name should return UnsupportedComponent error"
+        matches!(result, Err(ComponentError::NotFoundComponent { .. })),
+        "unknown evaluator name should return NotFoundComponent error"
     );
 }
 
@@ -149,8 +149,8 @@ fn resolving_unknown_reporter_name_returns_error() {
     let registry = ComponentRegistry::new();
     let result = registry.resolve_reporter("nonexistent");
     assert!(
-        matches!(result, Err(ComponentError::UnsupportedComponent { .. })),
-        "unknown reporter name should return UnsupportedComponent error"
+        matches!(result, Err(ComponentError::NotFoundComponent { .. })),
+        "unknown reporter name should return NotFoundComponent error"
     );
 }
 
