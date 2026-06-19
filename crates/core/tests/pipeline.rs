@@ -1,3 +1,6 @@
+mod support;
+
+use support::stub::{StubEvaluatorA, StubEvaluatorB, StubParser, StubReporter};
 use tgraphy_core::component::ComponentRegistry;
 use tgraphy_core::component::builtin::{BuiltinEvaluator, BuiltinParser, BuiltinReporter};
 use tgraphy_core::pipeline::{PipelineError, collect_step, evaluate_step, report_step};
@@ -479,6 +482,177 @@ fn collect_evaluate_report_end_to_end() {
 
     let _ = std::fs::remove_file(&evidence_out);
     let _ = std::fs::remove_file(&assessed_out);
+    let _ = std::fs::remove_file(&report_out);
+}
+
+// ── stub fixture components: pipeline integration ─────────────────────────────
+
+fn pipeline_fixture(name: &str) -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/pipeline")
+        .join(name)
+}
+
+fn stub_registry() -> ComponentRegistry {
+    let mut r = ComponentRegistry::new();
+    r.register_parser("stub-parser", Box::new(StubParser));
+    r.register_evaluator("stub-evaluator-a", Box::new(StubEvaluatorA));
+    r.register_evaluator("stub-evaluator-b", Box::new(StubEvaluatorB));
+    r.register_reporter("stub-reporter", Box::new(StubReporter));
+    r
+}
+
+fn read_json_file(path: &std::path::Path) -> serde_json::Value {
+    let content = std::fs::read_to_string(path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {}", path.display(), e));
+    serde_json::from_str(&content)
+        .unwrap_or_else(|e| panic!("failed to parse JSON from {}: {}", path.display(), e))
+}
+
+#[test]
+fn stub_collect_matches_evidence_fixture() {
+    let registry = stub_registry();
+    let input = fixture("valid_evidence.json");
+    let output = temp_path("stub_collect_evidence.json");
+
+    collect_step(&registry, "stub-parser", &input, &output).expect("stub collect should succeed");
+
+    let actual = read_json_file(&output);
+    let expected = read_json_file(&pipeline_fixture("evidence.json"));
+    assert_eq!(
+        actual, expected,
+        "collect output should match evidence fixture"
+    );
+
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn stub_first_evaluate_matches_assessed_first_fixture() {
+    let registry = stub_registry();
+    let input = fixture("valid_evidence.json");
+    let evidence_out = temp_path("stub_first_ev.json");
+    let assessed_out = temp_path("stub_first_assessed.json");
+
+    collect_step(&registry, "stub-parser", &input, &evidence_out).expect("collect should succeed");
+    evaluate_step(&registry, "stub-evaluator-a", &evidence_out, &assessed_out)
+        .expect("first evaluate should succeed");
+
+    let actual = read_json_file(&assessed_out);
+    let expected = read_json_file(&pipeline_fixture("assessed_first.json"));
+    assert_eq!(
+        actual, expected,
+        "first evaluate output should match assessed_first fixture"
+    );
+
+    let _ = std::fs::remove_file(&evidence_out);
+    let _ = std::fs::remove_file(&assessed_out);
+}
+
+#[test]
+fn stub_second_evaluate_matches_assessed_second_fixture() {
+    let registry = stub_registry();
+    let input = fixture("valid_evidence.json");
+    let evidence_out = temp_path("stub_second_ev.json");
+    let first_out = temp_path("stub_second_first.json");
+    let second_out = temp_path("stub_second_assessed.json");
+
+    collect_step(&registry, "stub-parser", &input, &evidence_out).expect("collect should succeed");
+    evaluate_step(&registry, "stub-evaluator-a", &evidence_out, &first_out)
+        .expect("first evaluate should succeed");
+    evaluate_step(&registry, "stub-evaluator-b", &first_out, &second_out)
+        .expect("second evaluate should succeed");
+
+    let actual = read_json_file(&second_out);
+    let expected = read_json_file(&pipeline_fixture("assessed_second.json"));
+    assert_eq!(
+        actual, expected,
+        "second evaluate output should match assessed_second fixture"
+    );
+
+    let _ = std::fs::remove_file(&evidence_out);
+    let _ = std::fs::remove_file(&first_out);
+    let _ = std::fs::remove_file(&second_out);
+}
+
+#[test]
+fn stub_report_matches_report_fixture() {
+    let registry = stub_registry();
+    let input = fixture("valid_evidence.json");
+    let evidence_out = temp_path("stub_report_ev.json");
+    let first_out = temp_path("stub_report_first.json");
+    let second_out = temp_path("stub_report_second.json");
+    let report_out = temp_path("stub_report.md");
+
+    collect_step(&registry, "stub-parser", &input, &evidence_out).expect("collect should succeed");
+    evaluate_step(&registry, "stub-evaluator-a", &evidence_out, &first_out)
+        .expect("first evaluate should succeed");
+    evaluate_step(&registry, "stub-evaluator-b", &first_out, &second_out)
+        .expect("second evaluate should succeed");
+    report_step(&registry, "stub-reporter", &second_out, &report_out)
+        .expect("report should succeed");
+
+    let actual = std::fs::read_to_string(&report_out).expect("report output should be readable");
+    let expected = std::fs::read_to_string(&pipeline_fixture("report.md"))
+        .expect("report fixture should be readable");
+    assert_eq!(
+        actual, expected,
+        "report output should match report fixture"
+    );
+
+    let _ = std::fs::remove_file(&evidence_out);
+    let _ = std::fs::remove_file(&first_out);
+    let _ = std::fs::remove_file(&second_out);
+    let _ = std::fs::remove_file(&report_out);
+}
+
+#[test]
+fn stub_full_pipeline_collect_evaluate_evaluate_report() {
+    let registry = stub_registry();
+    let input = fixture("valid_evidence.json");
+    let evidence_out = temp_path("stub_e2e_evidence.json");
+    let first_out = temp_path("stub_e2e_first.json");
+    let second_out = temp_path("stub_e2e_second.json");
+    let report_out = temp_path("stub_e2e_report.md");
+
+    collect_step(&registry, "stub-parser", &input, &evidence_out).expect("collect should succeed");
+
+    let ArtifactKind::Evidence(_) = tgraphy_core::io::read_artifact(&evidence_out).unwrap() else {
+        panic!("expected evidence artifact after collect");
+    };
+
+    evaluate_step(&registry, "stub-evaluator-a", &evidence_out, &first_out)
+        .expect("first evaluate should succeed");
+
+    let ArtifactKind::Assessed(ref first) = tgraphy_core::io::read_artifact(&first_out).unwrap()
+    else {
+        panic!("expected assessed artifact after first evaluate");
+    };
+    assert_eq!(first.assessment_layers.len(), 1);
+    assert_eq!(first.assessment_layers[0].id, "stub-layer-a");
+
+    evaluate_step(&registry, "stub-evaluator-b", &first_out, &second_out)
+        .expect("second evaluate should succeed");
+
+    let ArtifactKind::Assessed(ref second) = tgraphy_core::io::read_artifact(&second_out).unwrap()
+    else {
+        panic!("expected assessed artifact after second evaluate");
+    };
+    assert_eq!(second.assessment_layers.len(), 2);
+    assert_eq!(second.assessment_layers[0].id, "stub-layer-a");
+    assert_eq!(second.assessment_layers[1].id, "stub-layer-b");
+    assert_eq!(
+        first.evidence, second.evidence,
+        "evidence must be preserved across evaluations"
+    );
+
+    report_step(&registry, "stub-reporter", &second_out, &report_out)
+        .expect("report should succeed");
+    assert!(report_out.exists(), "report output file should exist");
+
+    let _ = std::fs::remove_file(&evidence_out);
+    let _ = std::fs::remove_file(&first_out);
+    let _ = std::fs::remove_file(&second_out);
     let _ = std::fs::remove_file(&report_out);
 }
 

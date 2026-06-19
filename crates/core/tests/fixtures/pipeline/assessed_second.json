@@ -1,0 +1,87 @@
+{
+    "schema_version": "0.0.1",
+    "artifact_type": "assessed_artifact",
+    "producer": {
+        "name": "stub-parser",
+        "version": "0.0.0"
+    },
+    "evidence": {
+        "test_cases": [
+            {
+                "id": "stub-test-001",
+                "name": "stub test case",
+                "source": {
+                    "file": "stub/test.ts"
+                },
+                "calls": [
+                    {
+                        "id": "stub-call-001",
+                        "role": "assertion_target_call",
+                        "callee": {
+                            "text": "stubFunction",
+                            "resolution_status": "unresolved"
+                        }
+                    }
+                ],
+                "assertions": [
+                    {
+                        "id": "stub-assertion-001",
+                        "style": "expect_matcher",
+                        "target_call_refs": ["stub-call-001"]
+                    }
+                ]
+            }
+        ],
+        "modules": [
+            {
+                "id": "stub-module-001",
+                "kind": "function",
+                "path": "stub/subject.ts",
+                "qualified_name": "stubFunction"
+            }
+        ],
+        "test_module_links": [
+            {
+                "test_id": "stub-test-001",
+                "module_id": "stub-module-001",
+                "relationship": "assertion_target",
+                "confidence": "high",
+                "evidence_refs": ["stub-call-001"]
+            }
+        ]
+    },
+    "assessment_layers": [
+        {
+            "schema_version": "0.0.1",
+            "id": "stub-layer-a",
+            "producer": {
+                "name": "stub-evaluator-a",
+                "version": "0.0.0",
+                "kind": "static"
+            },
+            "assessments": [
+                {
+                    "id": "stub-assessment-a-001",
+                    "kind": "diagnostic_note",
+                    "statement": "stub assessment from evaluator a"
+                }
+            ]
+        },
+        {
+            "schema_version": "0.0.1",
+            "id": "stub-layer-b",
+            "producer": {
+                "name": "stub-evaluator-b",
+                "version": "0.0.0",
+                "kind": "static"
+            },
+            "assessments": [
+                {
+                    "id": "stub-assessment-b-001",
+                    "kind": "diagnostic_note",
+                    "statement": "stub assessment from evaluator b"
+                }
+            ]
+        }
+    ]
+}
