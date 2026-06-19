@@ -27,8 +27,8 @@ pub enum ComponentError {
     #[error("component produced invalid output: {message}")]
     InvalidOutput { message: String },
 
-    #[error("unsupported component: {message}")]
-    UnsupportedComponent { message: String },
+    #[error("component not found: {message}")]
+    NotFoundComponent { message: String },
 
     #[error("component internal error: {message}")]
     InternalError { message: String },

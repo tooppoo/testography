@@ -34,7 +34,7 @@ impl ComponentRegistry {
 
     pub fn resolve_parser(&self, name: &str) -> ComponentResult<&dyn Parser> {
         self.parsers.get(name).map(|p| p.as_ref()).ok_or_else(|| {
-            ComponentError::UnsupportedComponent {
+            ComponentError::NotFoundComponent {
                 message: format!("no parser registered with name {name:?}"),
             }
         })
@@ -44,14 +44,14 @@ impl ComponentRegistry {
         self.evaluators
             .get(name)
             .map(|e| e.as_ref())
-            .ok_or_else(|| ComponentError::UnsupportedComponent {
+            .ok_or_else(|| ComponentError::NotFoundComponent {
                 message: format!("no evaluator registered with name {name:?}"),
             })
     }
 
     pub fn resolve_reporter(&self, name: &str) -> ComponentResult<&dyn Reporter> {
         self.reporters.get(name).map(|r| r.as_ref()).ok_or_else(|| {
-            ComponentError::UnsupportedComponent {
+            ComponentError::NotFoundComponent {
                 message: format!("no reporter registered with name {name:?}"),
             }
         })
