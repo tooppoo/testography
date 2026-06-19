@@ -593,7 +593,7 @@ fn stub_report_matches_report_fixture() {
         .expect("report should succeed");
 
     let actual = std::fs::read_to_string(&report_out).expect("report output should be readable");
-    let expected = std::fs::read_to_string(&pipeline_fixture("report.md"))
+    let expected = std::fs::read_to_string(pipeline_fixture("report.md"))
         .expect("report fixture should be readable");
     assert_eq!(
         actual, expected,
