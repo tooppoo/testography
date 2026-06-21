@@ -2,6 +2,7 @@ pub mod assessed;
 pub mod common;
 pub mod evidence;
 pub mod layer;
+pub mod staged;
 
 pub use assessed::AssessedArtifact;
 pub use common::{Diagnostic, DiagnosticLevel, Producer};
@@ -11,9 +12,17 @@ pub use evidence::{
     ResolutionStatus, Source, TestCase, TestModuleLink, ValueKind,
 };
 pub use layer::{Assessment, AssessmentKind, AssessmentLayer, AssessmentSeverity, LayerProducer};
+pub use staged::{
+    AssessedModuleEvidenceArtifact, BundleTest, Evaluator, Finding, FindingLayer, FindingLevel,
+    FindingSubject, ModuleEvidenceArtifact, ParsedEvidenceArtifact, StagedEvidence,
+    StagedModuleBundle, StagedTestModuleLink, SubjectKind,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArtifactKind {
     Evidence(EvidenceArtifact),
     Assessed(AssessedArtifact),
+    ParsedEvidence(ParsedEvidenceArtifact),
+    ModuleEvidence(ModuleEvidenceArtifact),
+    AssessedModuleEvidence(AssessedModuleEvidenceArtifact),
 }

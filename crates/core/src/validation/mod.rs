@@ -15,6 +15,7 @@ pub struct SchemaViolation {
 pub enum ReferenceViolation {
     DuplicateId { id: String },
     BrokenRef { field: String, id: String },
+    MissingRef { field: String },
 }
 
 #[derive(Debug, Error)]

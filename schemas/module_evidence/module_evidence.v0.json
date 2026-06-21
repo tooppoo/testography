@@ -1,0 +1,72 @@
+{
+    "$id": "https://raw.githubusercontent.com/tooppoo/testography/main/schemas/module_evidence/module_evidence.v0.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Testography Module Evidence Artifact v0",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "schema_version",
+        "artifact_type",
+        "evidence",
+        "module_bundles"
+    ],
+    "properties": {
+        "schema_version": {
+            "pattern": "^(v0|0(\\.\\d+\\.\\d+)?)$",
+            "type": "string"
+        },
+        "artifact_type": {
+            "const": "module_evidence"
+        },
+        "evidence": {
+            "$ref": "https://raw.githubusercontent.com/tooppoo/testography/main/schemas/parsed_evidence/parsed_evidence.v0.json#/$defs/evidence"
+        },
+        "module_bundles": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/module_bundle"
+            }
+        }
+    },
+    "$defs": {
+        "id": {
+            "minLength": 1,
+            "type": "string"
+        },
+        "module_bundle": {
+            "additionalProperties": false,
+            "type": "object",
+            "properties": {
+                "module_ref": {
+                    "$ref": "#/$defs/id"
+                },
+                "tests": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/bundle_test"
+                    }
+                }
+            },
+            "required": [
+                "module_ref",
+                "tests"
+            ]
+        },
+        "bundle_test": {
+            "additionalProperties": false,
+            "type": "object",
+            "properties": {
+                "test_ref": {
+                    "$ref": "#/$defs/id"
+                },
+                "link_ref": {
+                    "$ref": "#/$defs/id"
+                }
+            },
+            "required": [
+                "test_ref",
+                "link_ref"
+            ]
+        }
+    }
+}

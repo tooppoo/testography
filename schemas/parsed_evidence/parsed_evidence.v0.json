@@ -1,0 +1,528 @@
+{
+    "$id": "https://raw.githubusercontent.com/tooppoo/testography/main/schemas/parsed_evidence/parsed_evidence.v0.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Testography Parsed Evidence Artifact v0",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "schema_version",
+        "artifact_type",
+        "evidence"
+    ],
+    "properties": {
+        "schema_version": {
+            "$ref": "#/$defs/schema_version"
+        },
+        "artifact_type": {
+            "const": "parsed_evidence"
+        },
+        "evidence": {
+            "$ref": "#/$defs/evidence"
+        }
+    },
+    "$defs": {
+        "schema_version": {
+            "pattern": "^(v0|0(\\.\\d+\\.\\d+)?)$",
+            "type": "string"
+        },
+        "id": {
+            "minLength": 1,
+            "type": "string"
+        },
+        "confidence": {
+            "enum": [
+                "high",
+                "medium",
+                "low",
+                "unknown"
+            ],
+            "type": "string"
+        },
+        "source": {
+            "additionalProperties": false,
+            "type": "object",
+            "properties": {
+                "file": {
+                    "minLength": 1,
+                    "type": "string"
+                },
+                "line": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "column": {
+                    "minimum": 1,
+                    "type": "integer"
+                },
+                "language": {
+                    "type": "string"
+                },
+                "text": {
+                    "type": "string"
+                },
+                "text_hash": {
+                    "type": "string"
+                },
+                "extensions": {
+                    "additionalProperties": true,
+                    "type": "object"
+                }
+            },
+            "required": [
+                "file"
+            ]
+        },
+        "evidence": {
+            "additionalProperties": false,
+            "type": "object",
+            "properties": {
+                "test_cases": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/test_case"
+                    }
+                },
+                "modules": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/module"
+                    }
+                },
+                "test_module_links": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/test_module_link"
+                    }
+                }
+            }
+        },
+        "test_case": {
+            "additionalProperties": false,
+            "type": "object",
+            "properties": {
+                "id": {
+                    "$ref": "#/$defs/id"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "source": {
+                    "$ref": "#/$defs/source"
+                },
+                "suite": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "calls": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/call"
+                    }
+                },
+                "parameters": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/parameter"
+                    }
+                },
+                "assertions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/assertion"
+                    }
+                },
+                "mocks": {
+                    "type": "array",
+                    "items": {
+                        "additionalProperties": true,
+                        "type": "object"
+                    }
+                },
+                "fixtures": {
+                    "type": "array",
+                    "items": {
+                        "additionalProperties": true,
+                        "type": "object"
+                    }
+                },
+                "extensions": {
+                    "additionalProperties": true,
+                    "type": "object"
+                }
+            },
+            "required": [
+                "id",
+                "name",
+                "source"
+            ]
+        },
+        "call": {
+            "additionalProperties": false,
+            "type": "object",
+            "properties": {
+                "id": {
+                    "$ref": "#/$defs/id"
+                },
+                "role": {
+                    "enum": [
+                        "direct_call",
+                        "assertion_target_call",
+                        "setup_call",
+                        "fixture_call",
+                        "helper_call",
+                        "factory_call",
+                        "mock_setup_call",
+                        "unknown_call"
+                    ]
+                },
+                "callee": {
+                    "$ref": "#/$defs/callee"
+                },
+                "source": {
+                    "$ref": "#/$defs/source"
+                },
+                "extensions": {
+                    "additionalProperties": true,
+                    "type": "object"
+                }
+            },
+            "required": [
+                "id",
+                "role",
+                "callee"
+            ]
+        },
+        "callee": {
+            "additionalProperties": true,
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string"
+                },
+                "resolution_status": {
+                    "enum": [
+                        "resolved",
+                        "unresolved",
+                        "ambiguous",
+                        "unknown"
+                    ]
+                },
+                "confidence": {
+                    "$ref": "#/$defs/confidence"
+                },
+                "resolved_module_id": {
+                    "type": "string"
+                },
+                "resolved_symbol": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "text",
+                "resolution_status"
+            ]
+        },
+        "value": {
+            "additionalProperties": false,
+            "type": "object",
+            "properties": {
+                "value_kind": {
+                    "enum": [
+                        "string_literal",
+                        "number_literal",
+                        "boolean_literal",
+                        "null_literal",
+                        "undefined_literal",
+                        "language_specific_literal",
+                        "object_literal",
+                        "array_literal",
+                        "identifier",
+                        "call_expression",
+                        "member_expression",
+                        "template_literal",
+                        "closure",
+                        "unknown"
+                    ]
+                },
+                "literal_class": {
+                    "enum": [
+                        "empty_string",
+                        "whitespace_string",
+                        "non_empty_string",
+                        "zero",
+                        "positive_number",
+                        "negative_number",
+                        "integer",
+                        "float",
+                        "empty_array",
+                        "non_empty_array",
+                        "empty_object",
+                        "non_empty_object",
+                        "nullish",
+                        "true",
+                        "false",
+                        "unknown"
+                    ]
+                },
+                "object_shape": {
+                    "additionalProperties": {
+                        "$ref": "#/$defs/value"
+                    },
+                    "type": "object"
+                },
+                "array_items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/value"
+                    }
+                },
+                "origin": {
+                    "type": "string"
+                },
+                "syntax": {
+                    "type": "string"
+                },
+                "extensions": {
+                    "additionalProperties": true,
+                    "type": "object"
+                }
+            },
+            "required": [
+                "value_kind"
+            ]
+        },
+        "parameter": {
+            "additionalProperties": false,
+            "type": "object",
+            "properties": {
+                "id": {
+                    "$ref": "#/$defs/id"
+                },
+                "argument_index": {
+                    "minimum": 0,
+                    "type": "integer"
+                },
+                "value_kind": {
+                    "enum": [
+                        "string_literal",
+                        "number_literal",
+                        "boolean_literal",
+                        "null_literal",
+                        "undefined_literal",
+                        "language_specific_literal",
+                        "object_literal",
+                        "array_literal",
+                        "identifier",
+                        "call_expression",
+                        "member_expression",
+                        "template_literal",
+                        "closure",
+                        "unknown"
+                    ]
+                },
+                "call_ref": {
+                    "type": "string"
+                },
+                "literal_class": {
+                    "enum": [
+                        "empty_string",
+                        "whitespace_string",
+                        "non_empty_string",
+                        "zero",
+                        "positive_number",
+                        "negative_number",
+                        "integer",
+                        "float",
+                        "empty_array",
+                        "non_empty_array",
+                        "empty_object",
+                        "non_empty_object",
+                        "nullish",
+                        "true",
+                        "false",
+                        "unknown"
+                    ]
+                },
+                "object_shape": {
+                    "additionalProperties": {
+                        "$ref": "#/$defs/value"
+                    },
+                    "type": "object"
+                },
+                "array_items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/value"
+                    }
+                },
+                "origin": {
+                    "type": "string"
+                },
+                "syntax": {
+                    "type": "string"
+                },
+                "extensions": {
+                    "additionalProperties": true,
+                    "type": "object"
+                }
+            },
+            "required": [
+                "id",
+                "argument_index",
+                "value_kind"
+            ]
+        },
+        "assertion": {
+            "additionalProperties": false,
+            "type": "object",
+            "properties": {
+                "id": {
+                    "$ref": "#/$defs/id"
+                },
+                "style": {
+                    "enum": [
+                        "expect_matcher",
+                        "assert_function",
+                        "should_style",
+                        "unknown"
+                    ]
+                },
+                "framework": {
+                    "type": "string"
+                },
+                "matcher": {
+                    "additionalProperties": true,
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string"
+                        },
+                        "arguments": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/$defs/value"
+                            }
+                        }
+                    }
+                },
+                "target_call_refs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/id"
+                    }
+                },
+                "target_expression": {
+                    "type": "string"
+                },
+                "expected": {
+                    "$ref": "#/$defs/value"
+                },
+                "source": {
+                    "$ref": "#/$defs/source"
+                },
+                "extensions": {
+                    "additionalProperties": true,
+                    "type": "object"
+                }
+            },
+            "required": [
+                "id",
+                "style"
+            ]
+        },
+        "module": {
+            "additionalProperties": false,
+            "type": "object",
+            "properties": {
+                "id": {
+                    "$ref": "#/$defs/id"
+                },
+                "kind": {
+                    "enum": [
+                        "file",
+                        "symbol",
+                        "package",
+                        "class",
+                        "method",
+                        "function",
+                        "unknown"
+                    ]
+                },
+                "path": {
+                    "type": "string"
+                },
+                "qualified_name": {
+                    "type": "string"
+                },
+                "container": {
+                    "type": "string"
+                },
+                "language": {
+                    "type": "string"
+                },
+                "extensions": {
+                    "additionalProperties": true,
+                    "type": "object"
+                }
+            },
+            "required": [
+                "id",
+                "kind"
+            ]
+        },
+        "test_module_link": {
+            "additionalProperties": false,
+            "type": "object",
+            "properties": {
+                "id": {
+                    "$ref": "#/$defs/id"
+                },
+                "test_ref": {
+                    "$ref": "#/$defs/id"
+                },
+                "module_ref": {
+                    "$ref": "#/$defs/id"
+                },
+                "relationship": {
+                    "enum": [
+                        "directly_called",
+                        "assertion_target",
+                        "setup_dependency",
+                        "fixture_dependency",
+                        "factory_dependency",
+                        "mocked_dependency",
+                        "helper_dependency",
+                        "unresolved_candidate",
+                        "ambiguous_candidate"
+                    ]
+                },
+                "confidence": {
+                    "$ref": "#/$defs/confidence"
+                },
+                "basis": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "evidence_refs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/id"
+                    }
+                },
+                "extensions": {
+                    "additionalProperties": true,
+                    "type": "object"
+                }
+            },
+            "required": [
+                "id",
+                "test_ref",
+                "module_ref"
+            ]
+        }
+    }
+}

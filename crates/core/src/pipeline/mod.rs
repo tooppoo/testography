@@ -181,6 +181,24 @@ pub fn evaluate_step(
             updated.assessment_layers.push(layer);
             updated
         }
+        ArtifactKind::ParsedEvidence(_) => {
+            return Err(PipelineError::UnexpectedArtifactType {
+                expected: "evidence or assessed_artifact",
+                found: "parsed_evidence",
+            });
+        }
+        ArtifactKind::ModuleEvidence(_) => {
+            return Err(PipelineError::UnexpectedArtifactType {
+                expected: "evidence or assessed_artifact",
+                found: "module_evidence",
+            });
+        }
+        ArtifactKind::AssessedModuleEvidence(_) => {
+            return Err(PipelineError::UnexpectedArtifactType {
+                expected: "evidence or assessed_artifact",
+                found: "assessed_module_evidence",
+            });
+        }
     };
 
     validate_assessed(&assessed)?;
@@ -208,6 +226,24 @@ pub fn report_step(
             return Err(PipelineError::UnexpectedArtifactType {
                 expected: "assessed_artifact",
                 found: "evidence",
+            });
+        }
+        ArtifactKind::ParsedEvidence(_) => {
+            return Err(PipelineError::UnexpectedArtifactType {
+                expected: "assessed_artifact",
+                found: "parsed_evidence",
+            });
+        }
+        ArtifactKind::ModuleEvidence(_) => {
+            return Err(PipelineError::UnexpectedArtifactType {
+                expected: "assessed_artifact",
+                found: "module_evidence",
+            });
+        }
+        ArtifactKind::AssessedModuleEvidence(_) => {
+            return Err(PipelineError::UnexpectedArtifactType {
+                expected: "assessed_artifact",
+                found: "assessed_module_evidence",
             });
         }
     };
