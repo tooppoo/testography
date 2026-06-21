@@ -99,6 +99,28 @@ The component executed successfully but produced an artifact that fails JSON Sch
 
 ## Failure Paths
 
+### Path: Artifact file is malformed JSON
+
+```mermaid
+flowchart LR
+    component["any component"] --> file["artifact file\n(malformed JSON)"]
+    file -->|"JSON parse fails"| err["artifact JSON validation failure"]
+    style err fill:#fcc,color:#000
+```
+
+Any component or the core pipeline that reads an artifact file must attempt JSON parsing before any other validation. If parsing fails, no further validation is possible and the artifact cannot be routed to the correct schema.
+
+### Path: Artifact `artifact_type` is missing or unknown
+
+```mermaid
+flowchart LR
+    component["any component"] --> file["artifact file\n(valid JSON)"]
+    file -->|"artifact_type missing or unknown"| err["artifact type validation failure"]
+    style err fill:#fcc,color:#000
+```
+
+The artifact file is valid JSON but the pipeline cannot determine which stage it belongs to. Without a known `artifact_type`, the core cannot select the correct JSON Schema or enforce stage handoff rules. This is distinct from a JSON parsing error: the file is structurally sound but lacks a recognisable stage discriminant.
+
 ### Path: `parsed_evidence` passed directly to `evaluate`
 
 ```mermaid
