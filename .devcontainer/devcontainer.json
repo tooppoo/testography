@@ -2,12 +2,11 @@
   "name": "testography-dev",
   "image": "mcr.microsoft.com/devcontainers/base:2.1.9-trixie",
   "features": {
-    "ghcr.io/devcontainers/features/common-utils:2": {},
-    "ghcr.io/devcontainers/features/git:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/rust:1.5.0": {
         "version": "1.96.0"
-    }
+    },
+    "ghcr.io/tooppoo/devcontainer-features/git-kura:0": {}
   },
   "postCreateCommand": "sh scripts/setup-dev.sh",
   "remoteUser": "vscode",
