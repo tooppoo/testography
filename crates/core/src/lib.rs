@@ -13,8 +13,8 @@ pub use pipeline::PipelineError;
 pub use validation::{ArtifactError, ReferenceViolation, SchemaViolation};
 
 use validation::integrity::{
-    check_assessed_integrity, check_assessed_module_evidence_integrity, check_evidence_integrity,
-    check_module_evidence_integrity, check_parsed_evidence_integrity,
+    check_assessed_integrity, check_evidence_integrity, validate_assessed_module_evidence_refs,
+    validate_module_evidence_refs, validate_parsed_evidence_refs,
 };
 use validation::schema::{
     validate_assessed_module_evidence_schema, validate_assessed_schema, validate_evidence_schema,
@@ -79,7 +79,7 @@ pub fn parse_artifact(json: &str) -> Result<ArtifactKind, ArtifactError> {
             }
             let artifact: ParsedEvidenceArtifact =
                 serde_json::from_value(value).map_err(ArtifactError::ParseJson)?;
-            let ref_violations = check_parsed_evidence_integrity(&artifact);
+            let ref_violations = validate_parsed_evidence_refs(&artifact);
             if !ref_violations.is_empty() {
                 return Err(ArtifactError::ReferenceIntegrity(ref_violations));
             }
@@ -92,7 +92,7 @@ pub fn parse_artifact(json: &str) -> Result<ArtifactKind, ArtifactError> {
             }
             let artifact: ModuleEvidenceArtifact =
                 serde_json::from_value(value).map_err(ArtifactError::ParseJson)?;
-            let ref_violations = check_module_evidence_integrity(&artifact);
+            let ref_violations = validate_module_evidence_refs(&artifact);
             if !ref_violations.is_empty() {
                 return Err(ArtifactError::ReferenceIntegrity(ref_violations));
             }
@@ -105,7 +105,7 @@ pub fn parse_artifact(json: &str) -> Result<ArtifactKind, ArtifactError> {
             }
             let artifact: AssessedModuleEvidenceArtifact =
                 serde_json::from_value(value).map_err(ArtifactError::ParseJson)?;
-            let ref_violations = check_assessed_module_evidence_integrity(&artifact);
+            let ref_violations = validate_assessed_module_evidence_refs(&artifact);
             if !ref_violations.is_empty() {
                 return Err(ArtifactError::ReferenceIntegrity(ref_violations));
             }

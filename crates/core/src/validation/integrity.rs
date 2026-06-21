@@ -239,7 +239,7 @@ impl StagedEvidenceIds {
         let mut evidence_item_ids = HashSet::new();
         let mut violations = vec![];
 
-        for tc in evidence.test_cases.iter().flatten() {
+        for tc in &evidence.test_cases {
             if !test_case_ids.insert(tc.id.clone()) {
                 violations.push(ReferenceViolation::DuplicateId { id: tc.id.clone() });
             }
@@ -267,7 +267,7 @@ impl StagedEvidenceIds {
             }
         }
 
-        for module in evidence.modules.iter().flatten() {
+        for module in &evidence.modules {
             if !module_ids.insert(module.id.clone()) {
                 violations.push(ReferenceViolation::DuplicateId {
                     id: module.id.clone(),
@@ -275,7 +275,7 @@ impl StagedEvidenceIds {
             }
         }
 
-        for link in evidence.test_module_links.iter().flatten() {
+        for link in &evidence.test_module_links {
             if !link_ids.insert(link.id.clone()) {
                 violations.push(ReferenceViolation::DuplicateId {
                     id: link.id.clone(),
@@ -283,26 +283,42 @@ impl StagedEvidenceIds {
             }
         }
 
-        (
-            Self {
-                test_case_ids,
-                module_ids,
-                link_ids,
-                call_ids,
-                evidence_item_ids,
-            },
-            violations,
-        )
+        let ids = Self {
+            test_case_ids,
+            module_ids,
+            link_ids,
+            call_ids,
+            evidence_item_ids,
+        };
+
+        // Postcondition: every call ID is also an evidence item ID because calls are
+        // evidence items; both sets are populated in the same loop above.
+        debug_assert!(
+            ids.call_ids.is_subset(&ids.evidence_item_ids),
+            "call_ids must be a subset of evidence_item_ids"
+        );
+
+        (ids, violations)
     }
 }
 
-fn check_staged_evidence_refs(
+/// Validates that every cross-reference within `StagedEvidence` resolves to a declared entity ID.
+///
+/// Concretely, checks that:
+/// - `call.callee.resolved_module_id` points to a known module (when resolved)
+/// - `parameter.call_ref` points to a known call
+/// - `assertion.target_call_refs` point to known calls
+/// - `test_module_link.test_ref` / `module_ref` point to known test cases / modules
+/// - `test_module_link.evidence_refs` point to known evidence items (calls, params, assertions)
+///
+/// Precondition: `ids` was produced by `StagedEvidenceIds::collect` on the same `evidence`.
+fn validate_evidence_cross_refs(
     evidence: &StagedEvidence,
     ids: &StagedEvidenceIds,
 ) -> Vec<ReferenceViolation> {
     let mut violations = vec![];
 
-    for tc in evidence.test_cases.iter().flatten() {
+    for tc in &evidence.test_cases {
         for call in tc.calls.iter().flatten() {
             if call.callee.resolution_status == ResolutionStatus::Resolved
                 && let Some(ref mid) = call.callee.resolved_module_id
@@ -336,7 +352,7 @@ fn check_staged_evidence_refs(
         }
     }
 
-    for link in evidence.test_module_links.iter().flatten() {
+    for link in &evidence.test_module_links {
         if !ids.test_case_ids.contains(link.test_ref.as_str()) {
             violations.push(ReferenceViolation::BrokenRef {
                 field: "test_module_link.test_ref".to_string(),
@@ -349,7 +365,7 @@ fn check_staged_evidence_refs(
                 id: link.module_ref.clone(),
             });
         }
-        for ev_ref in link.evidence_refs.iter().flatten() {
+        for ev_ref in &link.evidence_refs {
             if !ids.evidence_item_ids.contains(ev_ref.as_str()) {
                 violations.push(ReferenceViolation::BrokenRef {
                     field: "test_module_link.evidence_refs".to_string(),
@@ -362,20 +378,26 @@ fn check_staged_evidence_refs(
     violations
 }
 
-pub fn check_parsed_evidence_integrity(
-    artifact: &ParsedEvidenceArtifact,
-) -> Vec<ReferenceViolation> {
+/// Validates referential integrity of a `ParsedEvidenceArtifact`.
+///
+/// Checks uniqueness of all entity IDs in evidence and that every cross-reference
+/// within the evidence section (call refs, module refs, link refs, evidence item refs)
+/// resolves to a declared entity.
+pub fn validate_parsed_evidence_refs(artifact: &ParsedEvidenceArtifact) -> Vec<ReferenceViolation> {
     let (ids, mut violations) = StagedEvidenceIds::collect(&artifact.evidence);
-    violations.extend(check_staged_evidence_refs(&artifact.evidence, &ids));
+    violations.extend(validate_evidence_cross_refs(&artifact.evidence, &ids));
     violations
 }
 
-pub fn check_module_evidence_integrity(
-    artifact: &ModuleEvidenceArtifact,
-) -> Vec<ReferenceViolation> {
+/// Validates referential integrity and total module-bundle coverage of a `ModuleEvidenceArtifact`.
+///
+/// In addition to the ref checks performed for `parsed_evidence`, verifies that
+/// `module_bundles` provides a total view of the evidence: every module and every
+/// test_module_link must be represented by exactly one bundle entry.
+pub fn validate_module_evidence_refs(artifact: &ModuleEvidenceArtifact) -> Vec<ReferenceViolation> {
     let (ids, mut violations) = StagedEvidenceIds::collect(&artifact.evidence);
-    violations.extend(check_staged_evidence_refs(&artifact.evidence, &ids));
-    violations.extend(check_module_bundles(
+    violations.extend(validate_evidence_cross_refs(&artifact.evidence, &ids));
+    violations.extend(validate_module_bundle_total_coverage(
         &artifact.evidence,
         &artifact.module_bundles,
         &ids,
@@ -383,21 +405,36 @@ pub fn check_module_evidence_integrity(
     violations
 }
 
-pub fn check_assessed_module_evidence_integrity(
+/// Validates referential integrity, total module-bundle coverage, and finding subject
+/// resolvability of an `AssessedModuleEvidenceArtifact`.
+///
+/// In addition to the checks performed for `module_evidence`, verifies that every
+/// finding subject with `kind != artifact` carries a `ref` that resolves to a known
+/// entity in the artifact.
+pub fn validate_assessed_module_evidence_refs(
     artifact: &AssessedModuleEvidenceArtifact,
 ) -> Vec<ReferenceViolation> {
     let (ids, mut violations) = StagedEvidenceIds::collect(&artifact.evidence);
-    violations.extend(check_staged_evidence_refs(&artifact.evidence, &ids));
-    violations.extend(check_module_bundles(
+    violations.extend(validate_evidence_cross_refs(&artifact.evidence, &ids));
+    violations.extend(validate_module_bundle_total_coverage(
         &artifact.evidence,
         &artifact.module_bundles,
         &ids,
     ));
-    violations.extend(check_finding_layers(&artifact.assessment_layers, &ids));
+    violations.extend(validate_finding_subject_refs(
+        &artifact.assessment_layers,
+        &ids,
+    ));
     violations
 }
 
-fn check_module_bundles(
+/// Validates that `module_bundles` provides total coverage of the staged evidence.
+///
+/// Every module in `evidence.modules` must be represented by exactly one bundle entry,
+/// and every link in `evidence.test_module_links` must be covered by exactly one
+/// `bundle_test.link_ref`. Also checks that bundle cross-references (`module_ref`,
+/// `test_ref`, `link_ref`) resolve consistently with the evidence.
+fn validate_module_bundle_total_coverage(
     evidence: &StagedEvidence,
     bundles: &[crate::artifact::staged::StagedModuleBundle],
     ids: &StagedEvidenceIds,
@@ -407,7 +444,7 @@ fn check_module_bundles(
     // Build the link map: link_id -> (test_ref, module_ref) for cross-checking.
     let mut link_map: std::collections::HashMap<&str, (&str, &str)> =
         std::collections::HashMap::new();
-    for link in evidence.test_module_links.iter().flatten() {
+    for link in &evidence.test_module_links {
         link_map.insert(
             link.id.as_str(),
             (link.test_ref.as_str(), link.module_ref.as_str()),
@@ -502,7 +539,14 @@ fn check_module_bundles(
     violations
 }
 
-fn check_finding_layers(
+/// Validates that finding subject refs resolve to known entities in the artifact.
+///
+/// For each finding subject, checks that:
+/// - Subjects with `kind = artifact` may omit `ref` (artifact-level findings).
+/// - Subjects with `kind = test_case | module | test_module_link` must carry a `ref`
+///   (`MissingRef` if absent) and the ref must resolve to a declared entity ID
+///   (`BrokenRef` if not found).
+fn validate_finding_subject_refs(
     layers: &[crate::artifact::staged::FindingLayer],
     ids: &StagedEvidenceIds,
 ) -> Vec<ReferenceViolation> {
@@ -523,7 +567,7 @@ fn check_finding_layers(
                     id: finding.id.clone(),
                 });
             }
-            for subject in finding.subjects.iter().flatten() {
+            for subject in &finding.subjects {
                 match (&subject.kind, &subject.entity_ref) {
                     (SubjectKind::Artifact, _) => {}
                     (_, None) => {

@@ -5,12 +5,12 @@ use super::evidence::{Module, TestCase};
 /// Parser-produced primary evidence, shared across all three staged artifact types.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StagedEvidence {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub test_cases: Option<Vec<TestCase>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub modules: Option<Vec<Module>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub test_module_links: Option<Vec<StagedTestModuleLink>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub test_cases: Vec<TestCase>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub modules: Vec<Module>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub test_module_links: Vec<StagedTestModuleLink>,
 }
 
 /// A test-to-module link entry with a stable `id` for cross-referencing.
@@ -27,10 +27,10 @@ pub struct StagedTestModuleLink {
     pub relationship: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub confidence: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub basis: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub evidence_refs: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub basis: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence_refs: Vec<String>,
 }
 
 /// Transform-produced module-centered view of a set of test-module links.
@@ -90,8 +90,8 @@ pub struct Finding {
     pub id: String,
     pub level: FindingLevel,
     pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub subjects: Option<Vec<FindingSubject>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub subjects: Vec<FindingSubject>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rationale: Option<String>,
 }
