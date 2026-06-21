@@ -89,13 +89,13 @@ The artifact file cannot be parsed as JSON.
 The artifact parses as valid JSON but the `artifact_type` field is missing or does not match any known artifact stage. This is distinct from a JSON parsing error because the file is well-formed; the pipeline simply cannot determine which stage the artifact belongs to.
 
 **Artifact schema validation failure**
-The artifact parses as JSON and has a known `artifact_type`, but its structure does not conform to the JSON Schema for that artifact type.
+The artifact parses as JSON and has a known `artifact_type`, but its structure does not conform to the JSON Schema for that artifact type. This class applies to artifacts sourced from outside the current pipeline execution: user-supplied files, cached files from a prior run, or files handed to a component by a caller rather than produced by an immediately preceding component in the same run. When a component in the current execution produces schema-invalid output, that is always classified as a component-produced invalid artifact failure, regardless of where in the pipeline the invalid output is detected.
 
 **Component execution failure**
 The pipeline component itself failed during execution (for example, a runtime crash, an I/O error, or a non-zero exit code unrelated to the artifact contract).
 
 **Component-produced invalid artifact failure**
-The component executed successfully but produced an artifact that fails JSON Schema validation. This indicates a defect in the component's output logic.
+A component in the current pipeline execution exited successfully but produced an artifact that fails JSON Schema validation. This indicates a defect in the component's output logic. This class applies regardless of which downstream step detects the invalid output.
 
 ## Failure Paths
 
@@ -145,16 +145,16 @@ flowchart LR
 
 `report` must reject `module_evidence`. The `evaluate` step was skipped and `assessment_layers` are absent.
 
-### Path: Artifact fails JSON Schema validation
+### Path: User-supplied artifact fails JSON Schema validation
 
 ```mermaid
 flowchart LR
-    transform["module-bundle transform"] --> me["module_evidence\n(schema-invalid output)"]
-    me -->|"evaluate validates input\nschema check fails"| err["artifact schema validation failure"]
+    user["user / external source"] --> file["module_evidence file\n(schema-invalid)"]
+    file -->|"caller passes to evaluate\nschema check fails"| err["artifact schema validation failure"]
     style err fill:#fcc,color:#000
 ```
 
-The core pipeline validates the input artifact against the JSON Schema for its `artifact_type` before passing it to the receiving component. Here the `artifact_type` is known and correct (`module_evidence`), so this is not a type validation failure; the artifact structure itself does not conform to the schema. The defect is in the component that produced the artifact, but the error is detected at the receiver's input boundary, not after the receiver has produced its own output.
+A caller passes a `module_evidence` file to `evaluate` directly — for example a manually authored file, a file cached from a prior pipeline run, or a file produced by a tool outside the current execution. The `artifact_type` is known and correct, so this is not a type validation failure; the structure does not conform to the schema. Because no component in the current pipeline execution produced the file, this is not a component-produced invalid artifact failure.
 
 ### Path: Component produces a schema-invalid artifact
 
