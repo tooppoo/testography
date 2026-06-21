@@ -1,0 +1,43 @@
+{
+    "schema_version": "0.0.1",
+    "artifact_type": "module_evidence",
+    "evidence": {
+        "test_cases": [
+            {
+                "id": "test-001",
+                "name": "rejects empty name",
+                "source": {
+                    "file": "tests/user.test.ts",
+                    "line": 12
+                }
+            }
+        ],
+        "modules": [
+            {
+                "id": "symbol:src/user/createUser.ts#createUser",
+                "kind": "symbol",
+                "path": "src/user/createUser.ts"
+            }
+        ],
+        "test_module_links": [
+            {
+                "id": "link-001",
+                "test_ref": "test-001",
+                "module_ref": "symbol:src/user/createUser.ts#createUser",
+                "relationship": "assertion_target",
+                "confidence": "high"
+            }
+        ]
+    },
+    "module_bundles": [
+        {
+            "module_ref": "symbol:src/user/createUser.ts#createUser",
+            "tests": [
+                {
+                    "test_ref": "test-001",
+                    "link_ref": "link-001"
+                }
+            ]
+        }
+    ]
+}

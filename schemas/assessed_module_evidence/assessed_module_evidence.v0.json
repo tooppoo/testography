@@ -1,0 +1,142 @@
+{
+    "$id": "https://raw.githubusercontent.com/tooppoo/testography/main/schemas/assessed_module_evidence/assessed_module_evidence.v0.json",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Testography Assessed Module Evidence Artifact v0",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "schema_version",
+        "artifact_type",
+        "evidence",
+        "module_bundles",
+        "assessment_layers"
+    ],
+    "properties": {
+        "schema_version": {
+            "pattern": "^(v0|0(\\.\\d+\\.\\d+)?)$",
+            "type": "string"
+        },
+        "artifact_type": {
+            "const": "assessed_module_evidence"
+        },
+        "evidence": {
+            "$ref": "https://raw.githubusercontent.com/tooppoo/testography/main/schemas/parsed_evidence/parsed_evidence.v0.json#/$defs/evidence"
+        },
+        "module_bundles": {
+            "type": "array",
+            "items": {
+                "$ref": "https://raw.githubusercontent.com/tooppoo/testography/main/schemas/module_evidence/module_evidence.v0.json#/$defs/module_bundle"
+            }
+        },
+        "assessment_layers": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/finding_layer"
+            }
+        }
+    },
+    "$defs": {
+        "id": {
+            "minLength": 1,
+            "type": "string"
+        },
+        "finding_layer": {
+            "additionalProperties": false,
+            "type": "object",
+            "properties": {
+                "id": {
+                    "$ref": "#/$defs/id"
+                },
+                "evaluator": {
+                    "$ref": "#/$defs/evaluator"
+                },
+                "summary": {
+                    "type": "string"
+                },
+                "findings": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/finding"
+                    }
+                }
+            },
+            "required": [
+                "id",
+                "evaluator",
+                "findings"
+            ]
+        },
+        "evaluator": {
+            "additionalProperties": false,
+            "type": "object",
+            "properties": {
+                "id": {
+                    "$ref": "#/$defs/id"
+                },
+                "version": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "id"
+            ]
+        },
+        "finding": {
+            "additionalProperties": false,
+            "type": "object",
+            "properties": {
+                "id": {
+                    "$ref": "#/$defs/id"
+                },
+                "level": {
+                    "enum": [
+                        "info",
+                        "warning",
+                        "error"
+                    ]
+                },
+                "message": {
+                    "minLength": 1,
+                    "type": "string"
+                },
+                "subjects": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/subject"
+                    }
+                },
+                "rationale": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "id",
+                "level",
+                "message"
+            ]
+        },
+        "subject": {
+            "additionalProperties": false,
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "enum": [
+                        "artifact",
+                        "test_case",
+                        "module",
+                        "test_module_link"
+                    ]
+                },
+                "ref": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "kind"
+            ]
+        }
+    }
+}

@@ -1,0 +1,54 @@
+{
+    "schema_version": "0.0.1",
+    "artifact_type": "parsed_evidence",
+    "evidence": {
+        "test_cases": [
+            {
+                "id": "test-001",
+                "name": "rejects empty name",
+                "source": {
+                    "file": "tests/user.test.ts",
+                    "line": 12,
+                    "language": "typescript"
+                },
+                "calls": [
+                    {
+                        "id": "call-001",
+                        "role": "assertion_target_call",
+                        "callee": {
+                            "text": "createUser",
+                            "resolution_status": "resolved",
+                            "resolved_module_id": "symbol:src/user/createUser.ts#createUser"
+                        }
+                    }
+                ],
+                "assertions": [
+                    {
+                        "id": "assertion-001",
+                        "style": "expect_matcher",
+                        "target_call_refs": ["call-001"],
+                        "matcher": {
+                            "name": "toThrow"
+                        }
+                    }
+                ]
+            }
+        ],
+        "modules": [
+            {
+                "id": "symbol:src/user/createUser.ts#createUser",
+                "kind": "symbol",
+                "path": "src/user/createUser.ts"
+            }
+        ],
+        "test_module_links": [
+            {
+                "id": "link-001",
+                "test_ref": "test-001",
+                "module_ref": "symbol:src/user/createUser.ts#createUser",
+                "relationship": "assertion_target",
+                "confidence": "high"
+            }
+        ]
+    }
+}

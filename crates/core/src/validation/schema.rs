@@ -12,9 +12,17 @@ const ASSESSED_SCHEMA_STR: &str = include_str!(
 const LAYER_SCHEMA_STR: &str = include_str!(
     "../../../../schemas/testography-assessment-layer/testography-assessment-layer.v0.json"
 );
+const PARSED_EVIDENCE_SCHEMA_STR: &str =
+    include_str!("../../../../schemas/parsed_evidence/parsed_evidence.v0.json");
+const MODULE_EVIDENCE_SCHEMA_STR: &str =
+    include_str!("../../../../schemas/module_evidence/module_evidence.v0.json");
+const ASSESSED_MODULE_EVIDENCE_SCHEMA_STR: &str =
+    include_str!("../../../../schemas/assessed_module_evidence/assessed_module_evidence.v0.json");
 
 const EVIDENCE_SCHEMA_URL: &str = "https://raw.githubusercontent.com/tooppoo/testography/main/schemas/testography-evidence/testography-evidence.v0.json";
 const LAYER_SCHEMA_URL: &str = "https://raw.githubusercontent.com/tooppoo/testography/main/schemas/testography-assessment-layer/testography-assessment-layer.v0.json";
+const PARSED_EVIDENCE_SCHEMA_URL: &str = "https://raw.githubusercontent.com/tooppoo/testography/main/schemas/parsed_evidence/parsed_evidence.v0.json";
+const MODULE_EVIDENCE_SCHEMA_URL: &str = "https://raw.githubusercontent.com/tooppoo/testography/main/schemas/module_evidence/module_evidence.v0.json";
 
 fn build_evidence_validator() -> Result<Validator, ArtifactError> {
     let schema: Value = serde_json::from_str(EVIDENCE_SCHEMA_STR)
@@ -44,6 +52,49 @@ fn build_assessed_validator() -> Result<Validator, ArtifactError> {
         .map_err(|e| ArtifactError::SchemaCompile(e.to_string()))
 }
 
+fn build_parsed_evidence_validator() -> Result<Validator, ArtifactError> {
+    let schema: Value = serde_json::from_str(PARSED_EVIDENCE_SCHEMA_STR)
+        .map_err(|e| ArtifactError::SchemaCompile(e.to_string()))?;
+    jsonschema::options()
+        .build(&schema)
+        .map_err(|e| ArtifactError::SchemaCompile(e.to_string()))
+}
+
+fn build_module_evidence_validator() -> Result<Validator, ArtifactError> {
+    let parsed_evidence_schema: Value = serde_json::from_str(PARSED_EVIDENCE_SCHEMA_STR)
+        .map_err(|e| ArtifactError::SchemaCompile(e.to_string()))?;
+    let schema: Value = serde_json::from_str(MODULE_EVIDENCE_SCHEMA_STR)
+        .map_err(|e| ArtifactError::SchemaCompile(e.to_string()))?;
+
+    let parsed_evidence_resource = Resource::from_contents(parsed_evidence_schema)
+        .map_err(|e| ArtifactError::SchemaCompile(e.to_string()))?;
+
+    jsonschema::options()
+        .with_resource(PARSED_EVIDENCE_SCHEMA_URL, parsed_evidence_resource)
+        .build(&schema)
+        .map_err(|e| ArtifactError::SchemaCompile(e.to_string()))
+}
+
+fn build_assessed_module_evidence_validator() -> Result<Validator, ArtifactError> {
+    let parsed_evidence_schema: Value = serde_json::from_str(PARSED_EVIDENCE_SCHEMA_STR)
+        .map_err(|e| ArtifactError::SchemaCompile(e.to_string()))?;
+    let module_evidence_schema: Value = serde_json::from_str(MODULE_EVIDENCE_SCHEMA_STR)
+        .map_err(|e| ArtifactError::SchemaCompile(e.to_string()))?;
+    let schema: Value = serde_json::from_str(ASSESSED_MODULE_EVIDENCE_SCHEMA_STR)
+        .map_err(|e| ArtifactError::SchemaCompile(e.to_string()))?;
+
+    let parsed_evidence_resource = Resource::from_contents(parsed_evidence_schema)
+        .map_err(|e| ArtifactError::SchemaCompile(e.to_string()))?;
+    let module_evidence_resource = Resource::from_contents(module_evidence_schema)
+        .map_err(|e| ArtifactError::SchemaCompile(e.to_string()))?;
+
+    jsonschema::options()
+        .with_resource(PARSED_EVIDENCE_SCHEMA_URL, parsed_evidence_resource)
+        .with_resource(MODULE_EVIDENCE_SCHEMA_URL, module_evidence_resource)
+        .build(&schema)
+        .map_err(|e| ArtifactError::SchemaCompile(e.to_string()))
+}
+
 fn collect_violations(validator: &Validator, instance: &Value) -> Vec<SchemaViolation> {
     validator
         .iter_errors(instance)
@@ -61,5 +112,26 @@ pub fn validate_evidence_schema(instance: &Value) -> Result<Vec<SchemaViolation>
 
 pub fn validate_assessed_schema(instance: &Value) -> Result<Vec<SchemaViolation>, ArtifactError> {
     let validator = build_assessed_validator()?;
+    Ok(collect_violations(&validator, instance))
+}
+
+pub fn validate_parsed_evidence_schema(
+    instance: &Value,
+) -> Result<Vec<SchemaViolation>, ArtifactError> {
+    let validator = build_parsed_evidence_validator()?;
+    Ok(collect_violations(&validator, instance))
+}
+
+pub fn validate_module_evidence_schema(
+    instance: &Value,
+) -> Result<Vec<SchemaViolation>, ArtifactError> {
+    let validator = build_module_evidence_validator()?;
+    Ok(collect_violations(&validator, instance))
+}
+
+pub fn validate_assessed_module_evidence_schema(
+    instance: &Value,
+) -> Result<Vec<SchemaViolation>, ArtifactError> {
+    let validator = build_assessed_module_evidence_validator()?;
     Ok(collect_violations(&validator, instance))
 }

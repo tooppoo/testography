@@ -4,13 +4,22 @@ pub mod io;
 pub mod pipeline;
 pub mod validation;
 
-pub use artifact::{ArtifactKind, AssessedArtifact, EvidenceArtifact};
+pub use artifact::{
+    ArtifactKind, AssessedArtifact, AssessedModuleEvidenceArtifact, EvidenceArtifact,
+    ModuleEvidenceArtifact, ParsedEvidenceArtifact,
+};
 pub use component::{ComponentError, ComponentRegistry, ComponentResult};
 pub use pipeline::PipelineError;
 pub use validation::{ArtifactError, ReferenceViolation, SchemaViolation};
 
-use validation::integrity::{check_assessed_integrity, check_evidence_integrity};
-use validation::schema::{validate_assessed_schema, validate_evidence_schema};
+use validation::integrity::{
+    check_assessed_integrity, check_assessed_module_evidence_integrity, check_evidence_integrity,
+    check_module_evidence_integrity, check_parsed_evidence_integrity,
+};
+use validation::schema::{
+    validate_assessed_module_evidence_schema, validate_assessed_schema, validate_evidence_schema,
+    validate_module_evidence_schema, validate_parsed_evidence_schema,
+};
 
 /// Parse and validate raw JSON as an artifact, dispatching by `artifact_type`.
 pub fn parse_artifact(json: &str) -> Result<ArtifactKind, ArtifactError> {
@@ -62,6 +71,45 @@ pub fn parse_artifact(json: &str) -> Result<ArtifactKind, ArtifactError> {
                 return Err(ArtifactError::ReferenceIntegrity(ref_violations));
             }
             Ok(ArtifactKind::Assessed(artifact))
+        }
+        "parsed_evidence" => {
+            let violations = validate_parsed_evidence_schema(&value)?;
+            if !violations.is_empty() {
+                return Err(ArtifactError::SchemaViolation(violations));
+            }
+            let artifact: ParsedEvidenceArtifact =
+                serde_json::from_value(value).map_err(ArtifactError::ParseJson)?;
+            let ref_violations = check_parsed_evidence_integrity(&artifact);
+            if !ref_violations.is_empty() {
+                return Err(ArtifactError::ReferenceIntegrity(ref_violations));
+            }
+            Ok(ArtifactKind::ParsedEvidence(artifact))
+        }
+        "module_evidence" => {
+            let violations = validate_module_evidence_schema(&value)?;
+            if !violations.is_empty() {
+                return Err(ArtifactError::SchemaViolation(violations));
+            }
+            let artifact: ModuleEvidenceArtifact =
+                serde_json::from_value(value).map_err(ArtifactError::ParseJson)?;
+            let ref_violations = check_module_evidence_integrity(&artifact);
+            if !ref_violations.is_empty() {
+                return Err(ArtifactError::ReferenceIntegrity(ref_violations));
+            }
+            Ok(ArtifactKind::ModuleEvidence(artifact))
+        }
+        "assessed_module_evidence" => {
+            let violations = validate_assessed_module_evidence_schema(&value)?;
+            if !violations.is_empty() {
+                return Err(ArtifactError::SchemaViolation(violations));
+            }
+            let artifact: AssessedModuleEvidenceArtifact =
+                serde_json::from_value(value).map_err(ArtifactError::ParseJson)?;
+            let ref_violations = check_assessed_module_evidence_integrity(&artifact);
+            if !ref_violations.is_empty() {
+                return Err(ArtifactError::ReferenceIntegrity(ref_violations));
+            }
+            Ok(ArtifactKind::AssessedModuleEvidence(artifact))
         }
         other => Err(ArtifactError::UnknownArtifactType {
             found: other.to_string(),

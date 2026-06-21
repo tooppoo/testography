@@ -825,3 +825,1148 @@ fn broken_assessment_ref_in_assessed_is_reported() {
         other => panic!("expected ReferenceIntegrity, got {:?}", other),
     }
 }
+
+// ── staged artifact: parsed_evidence ─────────────────────────────────────────
+
+#[test]
+fn valid_parsed_evidence_loads_and_roundtrips() {
+    let path = fixture("parsed_evidence/valid.json");
+    let kind = read_artifact(&path).expect("should load valid parsed_evidence artifact");
+
+    let ArtifactKind::ParsedEvidence(artifact) = kind else {
+        panic!("expected ParsedEvidence variant");
+    };
+
+    assert_eq!(artifact.schema_version, "0.0.1");
+    assert_eq!(artifact.artifact_type, "parsed_evidence");
+
+    let json = serde_json::to_string(&artifact).expect("serialize should succeed");
+    let kind2 = parse_artifact(&json).expect("re-parsed artifact should be valid");
+    assert!(matches!(kind2, ArtifactKind::ParsedEvidence(_)));
+}
+
+#[test]
+fn parsed_evidence_with_module_bundles_at_top_level_is_rejected() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "parsed_evidence",
+        "evidence": {},
+        "module_bundles": []
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::SchemaViolation(violations)) => {
+            assert!(!violations.is_empty(), "should have schema violation");
+        }
+        other => panic!(
+            "expected SchemaViolation for module_bundles in parsed_evidence, got {:?}",
+            other
+        ),
+    }
+}
+
+#[test]
+fn parsed_evidence_with_assessment_layers_at_top_level_is_rejected() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "parsed_evidence",
+        "evidence": {},
+        "assessment_layers": []
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::SchemaViolation(violations)) => {
+            assert!(!violations.is_empty(), "should have schema violation");
+        }
+        other => panic!(
+            "expected SchemaViolation for assessment_layers in parsed_evidence, got {:?}",
+            other
+        ),
+    }
+}
+
+#[test]
+fn parsed_evidence_link_missing_id_is_rejected() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "parsed_evidence",
+        "evidence": {
+            "test_cases": [{"id": "test-001", "name": "t1", "source": {"file": "a.ts"}}],
+            "modules": [{"id": "mod-001", "kind": "file"}],
+            "test_module_links": [
+                {"test_ref": "test-001", "module_ref": "mod-001"}
+            ]
+        }
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::SchemaViolation(violations)) => {
+            assert!(
+                !violations.is_empty(),
+                "should have schema violation for missing id"
+            );
+        }
+        other => panic!("expected SchemaViolation, got {:?}", other),
+    }
+}
+
+#[test]
+fn parsed_evidence_duplicate_link_id_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "parsed_evidence",
+        "evidence": {
+            "test_cases": [{"id": "test-001", "name": "t1", "source": {"file": "a.ts"}}],
+            "modules": [{"id": "mod-001", "kind": "file"}],
+            "test_module_links": [
+                {"id": "link-dup", "test_ref": "test-001", "module_ref": "mod-001"},
+                {"id": "link-dup", "test_ref": "test-001", "module_ref": "mod-001"}
+            ]
+        }
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(
+                    |v| matches!(v, ReferenceViolation::DuplicateId { id } if id == "link-dup")
+                ),
+                "expected DuplicateId for link-dup"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn parsed_evidence_broken_test_ref_in_link_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "parsed_evidence",
+        "evidence": {
+            "modules": [{"id": "mod-001", "kind": "file"}],
+            "test_module_links": [
+                {"id": "link-001", "test_ref": "test-MISSING", "module_ref": "mod-001"}
+            ]
+        }
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::BrokenRef { field, id }
+                        if field == "test_module_link.test_ref" && id == "test-MISSING"
+                )),
+                "expected BrokenRef for test-MISSING"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn parsed_evidence_broken_module_ref_in_link_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "parsed_evidence",
+        "evidence": {
+            "test_cases": [{"id": "test-001", "name": "t1", "source": {"file": "a.ts"}}],
+            "test_module_links": [
+                {"id": "link-001", "test_ref": "test-001", "module_ref": "mod-MISSING"}
+            ]
+        }
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::BrokenRef { field, id }
+                        if field == "test_module_link.module_ref" && id == "mod-MISSING"
+                )),
+                "expected BrokenRef for mod-MISSING"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+// ── staged artifact: module_evidence ─────────────────────────────────────────
+
+#[test]
+fn valid_module_evidence_loads_and_roundtrips() {
+    let path = fixture("module_evidence/valid.json");
+    let kind = read_artifact(&path).expect("should load valid module_evidence artifact");
+
+    let ArtifactKind::ModuleEvidence(artifact) = kind else {
+        panic!("expected ModuleEvidence variant");
+    };
+
+    assert_eq!(artifact.schema_version, "0.0.1");
+    assert_eq!(artifact.artifact_type, "module_evidence");
+    assert_eq!(artifact.module_bundles.len(), 1);
+    assert_eq!(artifact.module_bundles[0].tests.len(), 1);
+
+    let json = serde_json::to_string(&artifact).expect("serialize should succeed");
+    let kind2 = parse_artifact(&json).expect("re-parsed artifact should be valid");
+    assert!(matches!(kind2, ArtifactKind::ModuleEvidence(_)));
+}
+
+#[test]
+fn module_evidence_with_assessment_layers_at_top_level_is_rejected() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "module_evidence",
+        "evidence": {},
+        "module_bundles": [],
+        "assessment_layers": []
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::SchemaViolation(violations)) => {
+            assert!(!violations.is_empty(), "should have schema violation");
+        }
+        other => panic!(
+            "expected SchemaViolation for assessment_layers in module_evidence, got {:?}",
+            other
+        ),
+    }
+}
+
+#[test]
+fn module_evidence_missing_module_bundles_is_rejected() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "module_evidence",
+        "evidence": {}
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::SchemaViolation(violations)) => {
+            assert!(!violations.is_empty(), "module_bundles is required");
+        }
+        other => panic!("expected SchemaViolation, got {:?}", other),
+    }
+}
+
+#[test]
+fn module_evidence_bundle_with_missing_module_ref_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "module_evidence",
+        "evidence": {
+            "test_cases": [{"id": "test-001", "name": "t1", "source": {"file": "a.ts"}}],
+            "modules": [{"id": "mod-001", "kind": "file"}],
+            "test_module_links": [
+                {"id": "link-001", "test_ref": "test-001", "module_ref": "mod-001"}
+            ]
+        },
+        "module_bundles": [
+            {
+                "module_ref": "mod-MISSING",
+                "tests": [{"test_ref": "test-001", "link_ref": "link-001"}]
+            }
+        ]
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::BrokenRef { field, id }
+                        if field == "module_bundle.module_ref" && id == "mod-MISSING"
+                )),
+                "expected BrokenRef for mod-MISSING"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn module_evidence_uncovered_module_is_reported() {
+    // mod-002 exists in modules but has no bundle.
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "module_evidence",
+        "evidence": {
+            "test_cases": [{"id": "test-001", "name": "t1", "source": {"file": "a.ts"}}],
+            "modules": [
+                {"id": "mod-001", "kind": "file"},
+                {"id": "mod-002", "kind": "file"}
+            ],
+            "test_module_links": [
+                {"id": "link-001", "test_ref": "test-001", "module_ref": "mod-001"}
+            ]
+        },
+        "module_bundles": [
+            {
+                "module_ref": "mod-001",
+                "tests": [{"test_ref": "test-001", "link_ref": "link-001"}]
+            }
+        ]
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::BrokenRef { field, id }
+                        if field.contains("not covered") && id == "mod-002"
+                )),
+                "expected BrokenRef for uncovered mod-002, got {:?}",
+                violations
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn module_evidence_uncovered_link_is_reported() {
+    // link-002 exists in test_module_links but is not referenced by any bundle test.
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "module_evidence",
+        "evidence": {
+            "test_cases": [{"id": "test-001", "name": "t1", "source": {"file": "a.ts"}}],
+            "modules": [{"id": "mod-001", "kind": "file"}],
+            "test_module_links": [
+                {"id": "link-001", "test_ref": "test-001", "module_ref": "mod-001"},
+                {"id": "link-002", "test_ref": "test-001", "module_ref": "mod-001"}
+            ]
+        },
+        "module_bundles": [
+            {
+                "module_ref": "mod-001",
+                "tests": [{"test_ref": "test-001", "link_ref": "link-001"}]
+            }
+        ]
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::BrokenRef { field, id }
+                        if field.contains("not covered") && id == "link-002"
+                )),
+                "expected BrokenRef for uncovered link-002, got {:?}",
+                violations
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn module_evidence_duplicate_link_ref_across_bundles_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "module_evidence",
+        "evidence": {
+            "test_cases": [{"id": "test-001", "name": "t1", "source": {"file": "a.ts"}}],
+            "modules": [
+                {"id": "mod-001", "kind": "file"},
+                {"id": "mod-002", "kind": "file"}
+            ],
+            "test_module_links": [
+                {"id": "link-001", "test_ref": "test-001", "module_ref": "mod-001"}
+            ]
+        },
+        "module_bundles": [
+            {
+                "module_ref": "mod-001",
+                "tests": [{"test_ref": "test-001", "link_ref": "link-001"}]
+            },
+            {
+                "module_ref": "mod-002",
+                "tests": [{"test_ref": "test-001", "link_ref": "link-001"}]
+            }
+        ]
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::DuplicateId { id } if id == "link-001"
+                )),
+                "expected DuplicateId for link-001 used in two bundles"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn module_evidence_test_ref_mismatch_with_resolved_link_is_reported() {
+    // bundle_test.test_ref = "test-001" but link-001.test_ref = "test-002"
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "module_evidence",
+        "evidence": {
+            "test_cases": [
+                {"id": "test-001", "name": "t1", "source": {"file": "a.ts"}},
+                {"id": "test-002", "name": "t2", "source": {"file": "a.ts"}}
+            ],
+            "modules": [{"id": "mod-001", "kind": "file"}],
+            "test_module_links": [
+                {"id": "link-001", "test_ref": "test-002", "module_ref": "mod-001"}
+            ]
+        },
+        "module_bundles": [
+            {
+                "module_ref": "mod-001",
+                "tests": [{"test_ref": "test-001", "link_ref": "link-001"}]
+            }
+        ]
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::BrokenRef { field, .. }
+                        if field.contains("test_ref mismatch")
+                )),
+                "expected BrokenRef for test_ref mismatch, got {:?}",
+                violations
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn module_evidence_module_ref_mismatch_with_resolved_link_is_reported() {
+    // bundle module_ref = "mod-001" but link-001.module_ref = "mod-002"
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "module_evidence",
+        "evidence": {
+            "test_cases": [{"id": "test-001", "name": "t1", "source": {"file": "a.ts"}}],
+            "modules": [
+                {"id": "mod-001", "kind": "file"},
+                {"id": "mod-002", "kind": "file"}
+            ],
+            "test_module_links": [
+                {"id": "link-001", "test_ref": "test-001", "module_ref": "mod-002"}
+            ]
+        },
+        "module_bundles": [
+            {
+                "module_ref": "mod-001",
+                "tests": [{"test_ref": "test-001", "link_ref": "link-001"}]
+            },
+            {
+                "module_ref": "mod-002",
+                "tests": []
+            }
+        ]
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::BrokenRef { field, .. }
+                        if field.contains("module_ref mismatch")
+                )),
+                "expected BrokenRef for module_ref mismatch, got {:?}",
+                violations
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn module_evidence_same_test_ref_in_multiple_bundles_via_distinct_links_is_accepted() {
+    // test-001 links to both mod-001 and mod-002 through distinct links — allowed.
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "module_evidence",
+        "evidence": {
+            "test_cases": [{"id": "test-001", "name": "t1", "source": {"file": "a.ts"}}],
+            "modules": [
+                {"id": "mod-001", "kind": "file"},
+                {"id": "mod-002", "kind": "file"}
+            ],
+            "test_module_links": [
+                {"id": "link-001", "test_ref": "test-001", "module_ref": "mod-001"},
+                {"id": "link-002", "test_ref": "test-001", "module_ref": "mod-002"}
+            ]
+        },
+        "module_bundles": [
+            {
+                "module_ref": "mod-001",
+                "tests": [{"test_ref": "test-001", "link_ref": "link-001"}]
+            },
+            {
+                "module_ref": "mod-002",
+                "tests": [{"test_ref": "test-001", "link_ref": "link-002"}]
+            }
+        ]
+    }"#;
+    assert!(
+        parse_artifact(json).is_ok(),
+        "same test_ref in multiple bundles via distinct links should be accepted"
+    );
+}
+
+#[test]
+fn module_evidence_duplicate_module_ref_in_bundles_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "module_evidence",
+        "evidence": {
+            "modules": [{"id": "mod-001", "kind": "file"}],
+            "test_module_links": []
+        },
+        "module_bundles": [
+            {"module_ref": "mod-001", "tests": []},
+            {"module_ref": "mod-001", "tests": []}
+        ]
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::DuplicateId { id } if id == "mod-001"
+                )),
+                "expected DuplicateId for duplicate module_ref"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn module_evidence_module_with_no_links_has_empty_tests_bundle() {
+    // mod-001 has no links — represented by a bundle with empty tests array.
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "module_evidence",
+        "evidence": {
+            "modules": [{"id": "mod-001", "kind": "file"}],
+            "test_module_links": []
+        },
+        "module_bundles": [
+            {"module_ref": "mod-001", "tests": []}
+        ]
+    }"#;
+    assert!(
+        parse_artifact(json).is_ok(),
+        "module with no links should be represented as bundle with empty tests"
+    );
+}
+
+// ── staged artifact: assessed_module_evidence ─────────────────────────────────
+
+#[test]
+fn valid_assessed_module_evidence_loads_and_roundtrips() {
+    let path = fixture("assessed_module_evidence/valid.json");
+    let kind = read_artifact(&path).expect("should load valid assessed_module_evidence artifact");
+
+    let ArtifactKind::AssessedModuleEvidence(artifact) = kind else {
+        panic!("expected AssessedModuleEvidence variant");
+    };
+
+    assert_eq!(artifact.schema_version, "0.0.1");
+    assert_eq!(artifact.artifact_type, "assessed_module_evidence");
+    assert_eq!(artifact.assessment_layers.len(), 1);
+    assert_eq!(artifact.assessment_layers[0].findings.len(), 1);
+
+    let json = serde_json::to_string(&artifact).expect("serialize should succeed");
+    let kind2 = parse_artifact(&json).expect("re-parsed artifact should be valid");
+    assert!(matches!(kind2, ArtifactKind::AssessedModuleEvidence(_)));
+}
+
+#[test]
+fn assessed_module_evidence_missing_assessment_layers_is_rejected() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "assessed_module_evidence",
+        "evidence": {},
+        "module_bundles": []
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::SchemaViolation(violations)) => {
+            assert!(!violations.is_empty(), "assessment_layers is required");
+        }
+        other => panic!("expected SchemaViolation, got {:?}", other),
+    }
+}
+
+#[test]
+fn assessed_module_evidence_empty_assessment_layers_is_accepted() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "assessed_module_evidence",
+        "evidence": {},
+        "module_bundles": [],
+        "assessment_layers": []
+    }"#;
+    assert!(
+        parse_artifact(json).is_ok(),
+        "empty assessment_layers should be accepted"
+    );
+}
+
+#[test]
+fn assessed_module_evidence_duplicate_layer_id_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "assessed_module_evidence",
+        "evidence": {},
+        "module_bundles": [],
+        "assessment_layers": [
+            {
+                "id": "layer-dup",
+                "evaluator": {"id": "ev-001"},
+                "findings": []
+            },
+            {
+                "id": "layer-dup",
+                "evaluator": {"id": "ev-001"},
+                "findings": []
+            }
+        ]
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(
+                    |v| matches!(v, ReferenceViolation::DuplicateId { id } if id == "layer-dup")
+                ),
+                "expected DuplicateId for layer-dup"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn assessed_module_evidence_duplicate_finding_id_within_layer_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "assessed_module_evidence",
+        "evidence": {},
+        "module_bundles": [],
+        "assessment_layers": [
+            {
+                "id": "layer-001",
+                "evaluator": {"id": "ev-001"},
+                "findings": [
+                    {"id": "finding-dup", "level": "info", "message": "a"},
+                    {"id": "finding-dup", "level": "warning", "message": "b"}
+                ]
+            }
+        ]
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::DuplicateId { id } if id == "finding-dup"
+                )),
+                "expected DuplicateId for finding-dup"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn assessed_module_evidence_finding_level_error_does_not_make_artifact_schema_invalid() {
+    // findings[].level = "error" is a severity concept, not a schema validation failure.
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "assessed_module_evidence",
+        "evidence": {},
+        "module_bundles": [],
+        "assessment_layers": [
+            {
+                "id": "layer-001",
+                "evaluator": {"id": "ev-001"},
+                "findings": [
+                    {"id": "finding-001", "level": "error", "message": "critical issue found"}
+                ]
+            }
+        ]
+    }"#;
+    assert!(
+        parse_artifact(json).is_ok(),
+        "finding with level=error should not make the artifact schema-invalid"
+    );
+}
+
+#[test]
+fn assessed_module_evidence_invalid_finding_level_is_rejected() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "assessed_module_evidence",
+        "evidence": {},
+        "module_bundles": [],
+        "assessment_layers": [
+            {
+                "id": "layer-001",
+                "evaluator": {"id": "ev-001"},
+                "findings": [
+                    {"id": "finding-001", "level": "critical", "message": "bad level"}
+                ]
+            }
+        ]
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::SchemaViolation(violations)) => {
+            assert!(!violations.is_empty(), "invalid level should be rejected");
+        }
+        other => panic!(
+            "expected SchemaViolation for invalid level, got {:?}",
+            other
+        ),
+    }
+}
+
+// ── staged integrity: internal cross-refs inside parsed_evidence (P1) ─────────
+
+#[test]
+fn parsed_evidence_broken_resolved_module_id_in_call_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "parsed_evidence",
+        "evidence": {
+            "test_cases": [
+                {
+                    "id": "test-001",
+                    "name": "t1",
+                    "source": {"file": "a.ts"},
+                    "calls": [
+                        {
+                            "id": "call-001",
+                            "role": "direct_call",
+                            "callee": {
+                                "text": "fn",
+                                "resolution_status": "resolved",
+                                "resolved_module_id": "mod-MISSING"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::BrokenRef { field, id }
+                        if field == "callee.resolved_module_id" && id == "mod-MISSING"
+                )),
+                "expected BrokenRef for mod-MISSING in staged evidence"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn parsed_evidence_broken_parameter_call_ref_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "parsed_evidence",
+        "evidence": {
+            "test_cases": [
+                {
+                    "id": "test-001",
+                    "name": "t1",
+                    "source": {"file": "a.ts"},
+                    "parameters": [
+                        {
+                            "id": "param-001",
+                            "argument_index": 0,
+                            "value_kind": "string_literal",
+                            "call_ref": "call-MISSING"
+                        }
+                    ]
+                }
+            ]
+        }
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::BrokenRef { field, id }
+                        if field == "parameter.call_ref" && id == "call-MISSING"
+                )),
+                "expected BrokenRef for call-MISSING in parameter.call_ref"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn parsed_evidence_broken_assertion_target_call_ref_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "parsed_evidence",
+        "evidence": {
+            "test_cases": [
+                {
+                    "id": "test-001",
+                    "name": "t1",
+                    "source": {"file": "a.ts"},
+                    "assertions": [
+                        {
+                            "id": "assertion-001",
+                            "style": "expect_matcher",
+                            "target_call_refs": ["call-MISSING"]
+                        }
+                    ]
+                }
+            ]
+        }
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::BrokenRef { field, id }
+                        if field == "assertion.target_call_refs" && id == "call-MISSING"
+                )),
+                "expected BrokenRef for call-MISSING in assertion.target_call_refs"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn parsed_evidence_broken_link_evidence_refs_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "parsed_evidence",
+        "evidence": {
+            "test_cases": [{"id": "test-001", "name": "t1", "source": {"file": "a.ts"}}],
+            "modules": [{"id": "mod-001", "kind": "file"}],
+            "test_module_links": [
+                {
+                    "id": "link-001",
+                    "test_ref": "test-001",
+                    "module_ref": "mod-001",
+                    "evidence_refs": ["ev-MISSING"]
+                }
+            ]
+        }
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::BrokenRef { field, id }
+                        if field == "test_module_link.evidence_refs" && id == "ev-MISSING"
+                )),
+                "expected BrokenRef for ev-MISSING in test_module_link.evidence_refs"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+// ── staged integrity: finding subject refs in assessed_module_evidence (P2) ───
+
+#[test]
+fn assessed_module_evidence_subject_ref_to_missing_test_case_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "assessed_module_evidence",
+        "evidence": {},
+        "module_bundles": [],
+        "assessment_layers": [
+            {
+                "id": "layer-001",
+                "evaluator": {"id": "ev-001"},
+                "findings": [
+                    {
+                        "id": "finding-001",
+                        "level": "info",
+                        "message": "test",
+                        "subjects": [{"kind": "test_case", "ref": "test-MISSING"}]
+                    }
+                ]
+            }
+        ]
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::BrokenRef { field, id }
+                        if field == "finding_subject.ref" && id == "test-MISSING"
+                )),
+                "expected BrokenRef for test-MISSING subject ref"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn assessed_module_evidence_subject_ref_to_missing_module_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "assessed_module_evidence",
+        "evidence": {},
+        "module_bundles": [],
+        "assessment_layers": [
+            {
+                "id": "layer-001",
+                "evaluator": {"id": "ev-001"},
+                "findings": [
+                    {
+                        "id": "finding-001",
+                        "level": "warning",
+                        "message": "test",
+                        "subjects": [{"kind": "module", "ref": "mod-MISSING"}]
+                    }
+                ]
+            }
+        ]
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::BrokenRef { field, id }
+                        if field == "finding_subject.ref" && id == "mod-MISSING"
+                )),
+                "expected BrokenRef for mod-MISSING subject ref"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn assessed_module_evidence_subject_ref_to_missing_link_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "assessed_module_evidence",
+        "evidence": {},
+        "module_bundles": [],
+        "assessment_layers": [
+            {
+                "id": "layer-001",
+                "evaluator": {"id": "ev-001"},
+                "findings": [
+                    {
+                        "id": "finding-001",
+                        "level": "error",
+                        "message": "test",
+                        "subjects": [{"kind": "test_module_link", "ref": "link-MISSING"}]
+                    }
+                ]
+            }
+        ]
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations.iter().any(|v| matches!(
+                    v,
+                    ReferenceViolation::BrokenRef { field, id }
+                        if field == "finding_subject.ref" && id == "link-MISSING"
+                )),
+                "expected BrokenRef for link-MISSING subject ref"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn assessed_module_evidence_artifact_subject_without_ref_is_accepted() {
+    // artifact-level subject needs no ref.
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "assessed_module_evidence",
+        "evidence": {},
+        "module_bundles": [],
+        "assessment_layers": [
+            {
+                "id": "layer-001",
+                "evaluator": {"id": "ev-001"},
+                "findings": [
+                    {
+                        "id": "finding-001",
+                        "level": "info",
+                        "message": "artifact-level finding",
+                        "subjects": [{"kind": "artifact"}]
+                    }
+                ]
+            }
+        ]
+    }"#;
+    assert!(
+        parse_artifact(json).is_ok(),
+        "artifact subject without ref should be accepted"
+    );
+}
+
+#[test]
+fn assessed_module_evidence_valid_subject_refs_are_accepted() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "assessed_module_evidence",
+        "evidence": {
+            "test_cases": [{"id": "test-001", "name": "t1", "source": {"file": "a.ts"}}],
+            "modules": [{"id": "mod-001", "kind": "file"}],
+            "test_module_links": [
+                {"id": "link-001", "test_ref": "test-001", "module_ref": "mod-001"}
+            ]
+        },
+        "module_bundles": [
+            {
+                "module_ref": "mod-001",
+                "tests": [{"test_ref": "test-001", "link_ref": "link-001"}]
+            }
+        ],
+        "assessment_layers": [
+            {
+                "id": "layer-001",
+                "evaluator": {"id": "ev-001"},
+                "findings": [
+                    {
+                        "id": "finding-001",
+                        "level": "info",
+                        "message": "all valid refs",
+                        "subjects": [
+                            {"kind": "test_case", "ref": "test-001"},
+                            {"kind": "module", "ref": "mod-001"},
+                            {"kind": "test_module_link", "ref": "link-001"},
+                            {"kind": "artifact"}
+                        ]
+                    }
+                ]
+            }
+        ]
+    }"#;
+    assert!(
+        parse_artifact(json).is_ok(),
+        "valid subject refs should all be accepted"
+    );
+}
+
+// ── staged integrity: entity subjects missing ref (P2 follow-up) ─────────────
+
+#[test]
+fn assessed_module_evidence_test_case_subject_without_ref_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "assessed_module_evidence",
+        "evidence": {},
+        "module_bundles": [],
+        "assessment_layers": [
+            {
+                "id": "layer-001",
+                "evaluator": {"id": "ev-001"},
+                "findings": [
+                    {
+                        "id": "finding-001",
+                        "level": "info",
+                        "message": "missing ref on test_case subject",
+                        "subjects": [{"kind": "test_case"}]
+                    }
+                ]
+            }
+        ]
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations
+                    .iter()
+                    .any(|v| matches!(v, ReferenceViolation::MissingRef { field } if field == "finding_subject.ref")),
+                "expected MissingRef for test_case subject without ref"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn assessed_module_evidence_module_subject_without_ref_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "assessed_module_evidence",
+        "evidence": {},
+        "module_bundles": [],
+        "assessment_layers": [
+            {
+                "id": "layer-001",
+                "evaluator": {"id": "ev-001"},
+                "findings": [
+                    {
+                        "id": "finding-001",
+                        "level": "warning",
+                        "message": "missing ref on module subject",
+                        "subjects": [{"kind": "module"}]
+                    }
+                ]
+            }
+        ]
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations
+                    .iter()
+                    .any(|v| matches!(v, ReferenceViolation::MissingRef { field } if field == "finding_subject.ref")),
+                "expected MissingRef for module subject without ref"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
+
+#[test]
+fn assessed_module_evidence_link_subject_without_ref_is_reported() {
+    let json = r#"{
+        "schema_version": "0.0.1",
+        "artifact_type": "assessed_module_evidence",
+        "evidence": {},
+        "module_bundles": [],
+        "assessment_layers": [
+            {
+                "id": "layer-001",
+                "evaluator": {"id": "ev-001"},
+                "findings": [
+                    {
+                        "id": "finding-001",
+                        "level": "error",
+                        "message": "missing ref on test_module_link subject",
+                        "subjects": [{"kind": "test_module_link"}]
+                    }
+                ]
+            }
+        ]
+    }"#;
+    match parse_artifact(json) {
+        Err(ArtifactError::ReferenceIntegrity(violations)) => {
+            assert!(
+                violations
+                    .iter()
+                    .any(|v| matches!(v, ReferenceViolation::MissingRef { field } if field == "finding_subject.ref")),
+                "expected MissingRef for test_module_link subject without ref"
+            );
+        }
+        other => panic!("expected ReferenceIntegrity, got {:?}", other),
+    }
+}
