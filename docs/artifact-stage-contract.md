@@ -149,12 +149,12 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    ev["evaluate"] --> ame["assessed_module_evidence"]
-    ame -->|"fails schema check"| err["artifact schema validation failure"]
+    transform["module-bundle transform"] --> me["module_evidence\n(schema-invalid output)"]
+    me -->|"evaluate validates input\nschema check fails"| err["artifact schema validation failure"]
     style err fill:#fcc,color:#000
 ```
 
-The receiving component or the core pipeline validates the artifact against the JSON Schema for its `artifact_type` before further processing.
+The core pipeline validates the input artifact against the JSON Schema for its `artifact_type` before passing it to the receiving component. Here the `artifact_type` is known and correct (`module_evidence`), so this is not a type validation failure; the artifact structure itself does not conform to the schema. The defect is in the component that produced the artifact, but the error is detected at the receiver's input boundary, not after the receiver has produced its own output.
 
 ### Path: Component produces a schema-invalid artifact
 
