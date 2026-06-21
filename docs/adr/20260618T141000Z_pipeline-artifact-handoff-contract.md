@@ -1,8 +1,7 @@
 # Use File-Based Pipeline Artifact Handoff
 
-- Status: Superseded
+- Status: Superseded by [20260621T000000Z_staged-pipeline-artifact-handoff-contract.md](20260621T000000Z_staged-pipeline-artifact-handoff-contract.md)
 - Created: 2026-06-18T14:10:00Z
-- Superseded by: [20260621T000000Z_staged-pipeline-artifact-handoff-contract.md](20260621T000000Z_staged-pipeline-artifact-handoff-contract.md)
 
 ## Context
 

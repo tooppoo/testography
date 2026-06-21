@@ -47,23 +47,14 @@ Fields:
 
 ## Valid Artifact-Stage Transitions
 
-```
-[collect]
-  └─ writes ──► parsed_evidence
-
-parsed_evidence
-  └─ read by ──► [module-bundle transform]
-                   └─ writes ──► module_evidence
-
-module_evidence
-  └─ read by ──► [evaluate]  (initial evaluation)
-                   └─ writes ──► assessed_module_evidence
-
-assessed_module_evidence
-  └─ read by ──► [evaluate]  (evaluator chaining)
-  │                └─ writes ──► assessed_module_evidence
-  │
-  └─ read by ──► [report]
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> parsed_evidence : collect
+    parsed_evidence --> module_evidence : module-bundle transform
+    module_evidence --> assessed_module_evidence : evaluate (initial)
+    assessed_module_evidence --> assessed_module_evidence : evaluate (chained)
+    assessed_module_evidence --> [*] : report
 ```
 
 ### Evaluator chaining
@@ -81,7 +72,8 @@ The following table summarises invalid artifact-stage paths and the error class 
 | `module_evidence` reaches `report`                          | Pipeline / artifact contract error       |
 | `assessed_module_evidence` reaches module-bundle transform  | Pipeline / artifact contract error       |
 | Artifact JSON is malformed                                  | Artifact JSON validation failure         |
-| Artifact fails JSON Schema validation                       | Artifact schema validation failure       |
+| Artifact `artifact_type` is missing or unknown              | Artifact type validation failure         |
+| Artifact fails JSON Schema validation for its `artifact_type`| Artifact schema validation failure      |
 | Component exits with a non-zero exit code                   | Component execution failure              |
 | Component produces a schema-invalid artifact                | Component-produced invalid artifact failure |
 
@@ -91,7 +83,10 @@ The following table summarises invalid artifact-stage paths and the error class 
 An artifact of a stage that the receiving component does not accept has been passed to that component. This is a caller or orchestration error, not a defect in the component itself. The component must reject the artifact without processing it.
 
 **Artifact JSON validation failure**
-The artifact file cannot be parsed as JSON, or the `artifact_type` field is missing or unknown.
+The artifact file cannot be parsed as JSON.
+
+**Artifact type validation failure**
+The artifact parses as valid JSON but the `artifact_type` field is missing or does not match any known artifact stage. This is distinct from a JSON parsing error because the file is well-formed; the pipeline simply cannot determine which stage the artifact belongs to.
 
 **Artifact schema validation failure**
 The artifact parses as JSON and has a known `artifact_type`, but its structure does not conform to the JSON Schema for that artifact type.
@@ -106,55 +101,56 @@ The component executed successfully but produced an artifact that fails JSON Sch
 
 ### Path: `parsed_evidence` passed directly to `evaluate`
 
-```
-collect
-  └─ writes parsed_evidence
-                └─ [caller passes to evaluate — INVALID]
-                     └─ pipeline / artifact contract error
+```mermaid
+flowchart LR
+    collect --> pe["parsed_evidence"]
+    pe -->|"caller skips transform — INVALID"| ev["evaluate"]
+    ev --> err["pipeline / artifact contract error"]
+    style err fill:#fcc,color:#000
 ```
 
 `evaluate` must read the `artifact_type` field and reject `parsed_evidence` with a pipeline / artifact contract error. The module-bundle transform step was skipped.
 
 ### Path: `module_evidence` passed directly to `report`
 
-```
-module-bundle transform
-  └─ writes module_evidence
-                └─ [caller passes to report — INVALID]
-                     └─ pipeline / artifact contract error
+```mermaid
+flowchart LR
+    transform["module-bundle transform"] --> me["module_evidence"]
+    me -->|"caller skips evaluate — INVALID"| rep["report"]
+    rep --> err["pipeline / artifact contract error"]
+    style err fill:#fcc,color:#000
 ```
 
 `report` must reject `module_evidence`. The `evaluate` step was skipped and `assessment_layers` are absent.
 
 ### Path: Artifact fails JSON Schema validation
 
-```
-evaluate
-  └─ writes assessed_module_evidence
-                └─ [artifact fails schema check]
-                     └─ artifact schema validation failure
+```mermaid
+flowchart LR
+    ev["evaluate"] --> ame["assessed_module_evidence"]
+    ame -->|"fails schema check"| err["artifact schema validation failure"]
+    style err fill:#fcc,color:#000
 ```
 
 The receiving component or the core pipeline validates the artifact against the JSON Schema for its `artifact_type` before further processing.
 
 ### Path: Component produces a schema-invalid artifact
 
-```
-evaluate
-  └─ runs successfully (exit 0)
-  └─ writes assessed_module_evidence
-                └─ [output fails schema check]
-                     └─ component-produced invalid artifact failure
+```mermaid
+flowchart LR
+    ev["evaluate\nexit 0"] --> ame["assessed_module_evidence\noutput"]
+    ame -->|"output fails schema check"| err["component-produced\ninvalid artifact failure"]
+    style err fill:#fcc,color:#000
 ```
 
 The component exited cleanly but produced an output that does not satisfy the artifact contract. This is a defect in the component's output logic.
 
 ### Path: Component execution failure
 
-```
-evaluate
-  └─ crashes or exits non-zero
-       └─ component execution failure
+```mermaid
+flowchart LR
+    ev["evaluate"] -->|"crashes or exits non-zero"| err["component execution failure"]
+    style err fill:#fcc,color:#000
 ```
 
 The component did not produce an output artifact. This error is distinct from a contract violation: the component itself failed before completing its work.

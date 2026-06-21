@@ -35,24 +35,14 @@ Define the staged pipeline artifact handoff contract as follows.
 
 ### Valid artifact-stage transitions
 
-```text
-collect
-  └─ writes parsed_evidence
-
-module-bundle transform
-  ├─ reads  parsed_evidence
-  └─ writes module_evidence
-
-evaluate (initial)
-  ├─ reads  module_evidence
-  └─ writes assessed_module_evidence
-
-evaluate (chained)
-  ├─ reads  assessed_module_evidence
-  └─ writes assessed_module_evidence
-
-report
-  └─ reads  assessed_module_evidence
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> parsed_evidence : collect
+    parsed_evidence --> module_evidence : module-bundle transform
+    module_evidence --> assessed_module_evidence : evaluate (initial)
+    assessed_module_evidence --> assessed_module_evidence : evaluate (chained)
+    assessed_module_evidence --> [*] : report
 ```
 
 `parsed_evidence` reaching `evaluate` is a pipeline / artifact contract error, not a component execution error.
