@@ -47,6 +47,29 @@ pub struct BundleTest {
     pub link_ref: String,
 }
 
+/// Producer identity recorded in artifact lineage.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LineageProducer {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+}
+
+/// Provenance chain for a staged artifact, recorded as a tagged variant.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Lineage {
+    /// This artifact was derived from another artifact stage.
+    DerivedFrom {
+        input_artifact_type: String,
+        input_producer: LineageProducer,
+    },
+    /// This artifact is the origin (produced directly from a source, e.g. a parser).
+    Origin { source: String },
+}
+
 /// Evaluator identity used in a `FindingLayer`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Evaluator {
@@ -123,6 +146,7 @@ pub struct ModuleEvidenceArtifact {
     pub artifact_type: String,
     pub evidence: StagedEvidence,
     pub module_bundles: Vec<StagedModuleBundle>,
+    pub lineage: Lineage,
 }
 
 /// Evaluator output / reporter input: evidence + module bundles + assessment findings.

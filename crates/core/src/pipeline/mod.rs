@@ -1,6 +1,8 @@
 use std::path::{Component, Path, PathBuf};
 
-use crate::artifact::staged::{BundleTest, StagedEvidence, StagedModuleBundle};
+use crate::artifact::staged::{
+    BundleTest, Lineage, LineageProducer, StagedEvidence, StagedModuleBundle,
+};
 use crate::artifact::{
     AssessedModuleEvidenceArtifact, ModuleEvidenceArtifact, ParsedEvidenceArtifact,
 };
@@ -131,12 +133,16 @@ pub fn collect_step(
 }
 
 /// Derive one bundle per module from the existing test-module links.
+///
+/// Bundles are sorted by `module_ref`; tests within each bundle are sorted by
+/// (`test_ref`, `link_ref`) so that the output is deterministic regardless of
+/// the input order of `modules` and `test_module_links`.
 fn derive_module_bundles(evidence: &StagedEvidence) -> Vec<StagedModuleBundle> {
-    evidence
+    let mut bundles: Vec<StagedModuleBundle> = evidence
         .modules
         .iter()
         .map(|module| {
-            let tests = evidence
+            let mut tests: Vec<BundleTest> = evidence
                 .test_module_links
                 .iter()
                 .filter(|link| link.module_ref == module.id)
@@ -145,12 +151,19 @@ fn derive_module_bundles(evidence: &StagedEvidence) -> Vec<StagedModuleBundle> {
                     link_ref: link.id.clone(),
                 })
                 .collect();
+            tests.sort_by(|a, b| {
+                a.test_ref
+                    .cmp(&b.test_ref)
+                    .then(a.link_ref.cmp(&b.link_ref))
+            });
             StagedModuleBundle {
                 module_ref: module.id.clone(),
                 tests,
             }
         })
-        .collect()
+        .collect();
+    bundles.sort_by(|a, b| a.module_ref.cmp(&b.module_ref));
+    bundles
 }
 
 /// Run the transform step: read `input` (parsed_evidence), derive module bundles
@@ -201,6 +214,14 @@ pub fn transform_step(input: &Path, output: &Path) -> Result<(), PipelineError> 
         artifact_type: "module_evidence".to_string(),
         evidence: parsed.evidence,
         module_bundles,
+        lineage: Lineage::DerivedFrom {
+            input_artifact_type: "parsed_evidence".to_string(),
+            input_producer: LineageProducer {
+                name: "module-bundle-transform".to_string(),
+                version: None,
+                kind: Some("transform".to_string()),
+            },
+        },
     };
 
     validate_module_evidence(&module_evidence)?;

@@ -8,7 +8,8 @@
         "schema_version",
         "artifact_type",
         "evidence",
-        "module_bundles"
+        "module_bundles",
+        "lineage"
     ],
     "properties": {
         "schema_version": {
@@ -26,6 +27,9 @@
             "items": {
                 "$ref": "#/$defs/module_bundle"
             }
+        },
+        "lineage": {
+            "$ref": "#/$defs/lineage"
         }
     },
     "$defs": {
@@ -67,6 +71,39 @@
                 "test_ref",
                 "link_ref"
             ]
+        },
+        "lineage": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "kind": { "const": "derived_from" },
+                        "input_artifact_type": { "$ref": "#/$defs/id" },
+                        "input_producer": { "$ref": "#/$defs/lineage_producer" }
+                    },
+                    "required": ["kind", "input_artifact_type", "input_producer"]
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "kind": { "const": "origin" },
+                        "source": { "type": "string", "minLength": 1 }
+                    },
+                    "required": ["kind", "source"]
+                }
+            ]
+        },
+        "lineage_producer": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "name": { "type": "string", "minLength": 1 },
+                "version": { "type": "string" },
+                "kind": { "type": "string" }
+            },
+            "required": ["name"]
         }
     }
 }

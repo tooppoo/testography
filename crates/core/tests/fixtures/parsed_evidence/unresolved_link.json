@@ -1,0 +1,30 @@
+{
+    "schema_version": "0.0.1",
+    "artifact_type": "parsed_evidence",
+    "evidence": {
+        "test_cases": [
+            {
+                "id": "test-a",
+                "name": "test A",
+                "source": {
+                    "file": "tests/test_a.ts"
+                }
+            }
+        ],
+        "modules": [
+            {
+                "id": "unresolved-target-001",
+                "kind": "unknown"
+            }
+        ],
+        "test_module_links": [
+            {
+                "id": "link-001",
+                "test_ref": "test-a",
+                "module_ref": "unresolved-target-001",
+                "relationship": "unresolved_candidate",
+                "confidence": "low"
+            }
+        ]
+    }
+}

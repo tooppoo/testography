@@ -61,5 +61,13 @@
                 }
             ]
         }
-    ]
+    ],
+    "lineage": {
+        "kind": "derived_from",
+        "input_artifact_type": "parsed_evidence",
+        "input_producer": {
+            "name": "module-bundle-transform",
+            "kind": "transform"
+        }
+    }
 }

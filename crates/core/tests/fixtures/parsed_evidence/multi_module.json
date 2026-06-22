@@ -1,0 +1,57 @@
+{
+    "schema_version": "0.0.1",
+    "artifact_type": "parsed_evidence",
+    "evidence": {
+        "test_cases": [
+            {
+                "id": "test-a",
+                "name": "test A",
+                "source": {
+                    "file": "tests/test_a.ts"
+                }
+            },
+            {
+                "id": "test-b",
+                "name": "test B",
+                "source": {
+                    "file": "tests/test_b.ts"
+                }
+            }
+        ],
+        "modules": [
+            {
+                "id": "module-x",
+                "kind": "function",
+                "path": "src/module_x.ts"
+            },
+            {
+                "id": "module-y",
+                "kind": "function",
+                "path": "src/module_y.ts"
+            }
+        ],
+        "test_module_links": [
+            {
+                "id": "link-ax",
+                "test_ref": "test-a",
+                "module_ref": "module-x",
+                "relationship": "directly_called",
+                "confidence": "high"
+            },
+            {
+                "id": "link-ay",
+                "test_ref": "test-a",
+                "module_ref": "module-y",
+                "relationship": "setup_dependency",
+                "confidence": "medium"
+            },
+            {
+                "id": "link-by",
+                "test_ref": "test-b",
+                "module_ref": "module-y",
+                "relationship": "assertion_target",
+                "confidence": "high"
+            }
+        ]
+    }
+}

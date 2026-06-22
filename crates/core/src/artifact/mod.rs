@@ -14,8 +14,8 @@ pub use evidence::{
 pub use layer::{Assessment, AssessmentKind, AssessmentLayer, AssessmentSeverity, LayerProducer};
 pub use staged::{
     AssessedModuleEvidenceArtifact, BundleTest, Evaluator, Finding, FindingLayer, FindingLevel,
-    FindingSubject, ModuleEvidenceArtifact, ParsedEvidenceArtifact, StagedEvidence,
-    StagedModuleBundle, StagedTestModuleLink, SubjectKind,
+    FindingSubject, Lineage, LineageProducer, ModuleEvidenceArtifact, ParsedEvidenceArtifact,
+    StagedEvidence, StagedModuleBundle, StagedTestModuleLink, SubjectKind,
 };
 
 #[derive(Debug, Clone, PartialEq)]
