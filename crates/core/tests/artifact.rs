@@ -1061,7 +1061,8 @@ fn module_evidence_bundle_with_missing_module_ref_is_reported() {
                 "module_ref": "mod-MISSING",
                 "tests": [{"test_ref": "test-001", "link_ref": "link-001"}]
             }
-        ]
+        ],
+        "lineage": {"kind": "derived_from", "input_artifact_type": "parsed_evidence", "input_producer": {"name": "module-bundle-transform"}}
     }"#;
     match parse_artifact(json) {
         Err(ArtifactError::ReferenceIntegrity(violations)) => {
@@ -1099,7 +1100,8 @@ fn module_evidence_uncovered_module_is_reported() {
                 "module_ref": "mod-001",
                 "tests": [{"test_ref": "test-001", "link_ref": "link-001"}]
             }
-        ]
+        ],
+        "lineage": {"kind": "derived_from", "input_artifact_type": "parsed_evidence", "input_producer": {"name": "module-bundle-transform"}}
     }"#;
     match parse_artifact(json) {
         Err(ArtifactError::ReferenceIntegrity(violations)) => {
@@ -1136,7 +1138,8 @@ fn module_evidence_uncovered_link_is_reported() {
                 "module_ref": "mod-001",
                 "tests": [{"test_ref": "test-001", "link_ref": "link-001"}]
             }
-        ]
+        ],
+        "lineage": {"kind": "derived_from", "input_artifact_type": "parsed_evidence", "input_producer": {"name": "module-bundle-transform"}}
     }"#;
     match parse_artifact(json) {
         Err(ArtifactError::ReferenceIntegrity(violations)) => {
@@ -1178,7 +1181,8 @@ fn module_evidence_duplicate_link_ref_across_bundles_is_reported() {
                 "module_ref": "mod-002",
                 "tests": [{"test_ref": "test-001", "link_ref": "link-001"}]
             }
-        ]
+        ],
+        "lineage": {"kind": "derived_from", "input_artifact_type": "parsed_evidence", "input_producer": {"name": "module-bundle-transform"}}
     }"#;
     match parse_artifact(json) {
         Err(ArtifactError::ReferenceIntegrity(violations)) => {
@@ -1215,7 +1219,8 @@ fn module_evidence_test_ref_mismatch_with_resolved_link_is_reported() {
                 "module_ref": "mod-001",
                 "tests": [{"test_ref": "test-001", "link_ref": "link-001"}]
             }
-        ]
+        ],
+        "lineage": {"kind": "derived_from", "input_artifact_type": "parsed_evidence", "input_producer": {"name": "module-bundle-transform"}}
     }"#;
     match parse_artifact(json) {
         Err(ArtifactError::ReferenceIntegrity(violations)) => {
@@ -1258,7 +1263,8 @@ fn module_evidence_module_ref_mismatch_with_resolved_link_is_reported() {
                 "module_ref": "mod-002",
                 "tests": []
             }
-        ]
+        ],
+        "lineage": {"kind": "derived_from", "input_artifact_type": "parsed_evidence", "input_producer": {"name": "module-bundle-transform"}}
     }"#;
     match parse_artifact(json) {
         Err(ArtifactError::ReferenceIntegrity(violations)) => {
@@ -1302,7 +1308,8 @@ fn module_evidence_same_test_ref_in_multiple_bundles_via_distinct_links_is_accep
                 "module_ref": "mod-002",
                 "tests": [{"test_ref": "test-001", "link_ref": "link-002"}]
             }
-        ]
+        ],
+        "lineage": {"kind": "derived_from", "input_artifact_type": "parsed_evidence", "input_producer": {"name": "module-bundle-transform"}}
     }"#;
     assert!(
         parse_artifact(json).is_ok(),
@@ -1322,7 +1329,8 @@ fn module_evidence_duplicate_module_ref_in_bundles_is_reported() {
         "module_bundles": [
             {"module_ref": "mod-001", "tests": []},
             {"module_ref": "mod-001", "tests": []}
-        ]
+        ],
+        "lineage": {"kind": "derived_from", "input_artifact_type": "parsed_evidence", "input_producer": {"name": "module-bundle-transform"}}
     }"#;
     match parse_artifact(json) {
         Err(ArtifactError::ReferenceIntegrity(violations)) => {
@@ -1350,7 +1358,8 @@ fn module_evidence_module_with_no_links_has_empty_tests_bundle() {
         },
         "module_bundles": [
             {"module_ref": "mod-001", "tests": []}
-        ]
+        ],
+        "lineage": {"kind": "derived_from", "input_artifact_type": "parsed_evidence", "input_producer": {"name": "module-bundle-transform"}}
     }"#;
     assert!(
         parse_artifact(json).is_ok(),

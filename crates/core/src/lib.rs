@@ -5,8 +5,8 @@ pub mod pipeline;
 pub mod validation;
 
 pub use artifact::{
-    ArtifactKind, AssessedArtifact, AssessedModuleEvidenceArtifact, EvidenceArtifact,
-    ModuleEvidenceArtifact, ParsedEvidenceArtifact,
+    ArtifactKind, AssessedArtifact, AssessedModuleEvidenceArtifact, EvidenceArtifact, Lineage,
+    LineageProducer, ModuleEvidenceArtifact, ParsedEvidenceArtifact,
 };
 pub use component::{ComponentError, ComponentRegistry, ComponentResult};
 pub use pipeline::PipelineError;

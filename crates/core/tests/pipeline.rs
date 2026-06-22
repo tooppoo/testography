@@ -280,6 +280,164 @@ fn transform_fails_with_io_error_for_missing_input() {
     );
 }
 
+// ── transform step: algorithm behaviour ──────────────────────────────────────
+
+#[test]
+fn transform_distributes_multi_module_test_to_each_bundle() {
+    let input = fixture("parsed_evidence/multi_module.json");
+    let output = temp_path("transform_multi_module.json");
+
+    transform_step(&input, &output).expect("transform should succeed");
+
+    let artifact = tgraphy_core::io::read_artifact(&output).expect("output should be readable");
+    let ArtifactKind::ModuleEvidence(me) = artifact else {
+        panic!("expected module_evidence artifact");
+    };
+
+    assert_eq!(
+        me.module_bundles.len(),
+        2,
+        "should have one bundle per module"
+    );
+
+    // Bundles are sorted by module_ref: module-x < module-y.
+    let bundle_x = &me.module_bundles[0];
+    assert_eq!(bundle_x.module_ref, "module-x");
+    assert_eq!(bundle_x.tests.len(), 1, "module-x has one link (test-a)");
+    assert_eq!(bundle_x.tests[0].test_ref, "test-a");
+    assert_eq!(bundle_x.tests[0].link_ref, "link-ax");
+
+    let bundle_y = &me.module_bundles[1];
+    assert_eq!(bundle_y.module_ref, "module-y");
+    assert_eq!(
+        bundle_y.tests.len(),
+        2,
+        "module-y has two links (test-a and test-b)"
+    );
+    // Tests within bundle-y are sorted by (test_ref, link_ref): test-a < test-b.
+    assert_eq!(bundle_y.tests[0].test_ref, "test-a");
+    assert_eq!(bundle_y.tests[0].link_ref, "link-ay");
+    assert_eq!(bundle_y.tests[1].test_ref, "test-b");
+    assert_eq!(bundle_y.tests[1].link_ref, "link-by");
+
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn transform_preserves_unresolved_candidate_link_in_bundle() {
+    let input = fixture("parsed_evidence/unresolved_link.json");
+    let output = temp_path("transform_unresolved.json");
+
+    transform_step(&input, &output).expect("transform should succeed");
+
+    let artifact = tgraphy_core::io::read_artifact(&output).expect("output should be readable");
+    let ArtifactKind::ModuleEvidence(me) = artifact else {
+        panic!("expected module_evidence artifact");
+    };
+
+    assert_eq!(me.module_bundles.len(), 1);
+    assert_eq!(me.module_bundles[0].module_ref, "unresolved-target-001");
+    assert_eq!(me.module_bundles[0].tests.len(), 1);
+    assert_eq!(me.module_bundles[0].tests[0].test_ref, "test-a");
+    assert_eq!(me.module_bundles[0].tests[0].link_ref, "link-001");
+
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn transform_preserves_ambiguous_candidate_link_in_bundle() {
+    let input = fixture("parsed_evidence/ambiguous_link.json");
+    let output = temp_path("transform_ambiguous.json");
+
+    transform_step(&input, &output).expect("transform should succeed");
+
+    let artifact = tgraphy_core::io::read_artifact(&output).expect("output should be readable");
+    let ArtifactKind::ModuleEvidence(me) = artifact else {
+        panic!("expected module_evidence artifact");
+    };
+
+    assert_eq!(me.module_bundles.len(), 1);
+    assert_eq!(me.module_bundles[0].module_ref, "ambiguous-target-001");
+    assert_eq!(me.module_bundles[0].tests.len(), 1);
+    assert_eq!(me.module_bundles[0].tests[0].test_ref, "test-a");
+    assert_eq!(me.module_bundles[0].tests[0].link_ref, "link-001");
+
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn transform_is_idempotent_for_module_bundle_derivation() {
+    // Run transform on a parsed_evidence to produce a module_evidence.
+    let input = fixture("parsed_evidence/valid.json");
+    let first_out = temp_path("idempotent_first.json");
+    transform_step(&input, &first_out).expect("first transform should succeed");
+
+    let ArtifactKind::ModuleEvidence(first_me) =
+        tgraphy_core::io::read_artifact(&first_out).unwrap()
+    else {
+        panic!("expected module_evidence after first transform");
+    };
+
+    // Re-construct a parsed_evidence from the module_evidence's evidence and
+    // apply transform again — the module_bundles must be identical.
+    let re_input = tgraphy_core::ParsedEvidenceArtifact {
+        schema_version: first_me.schema_version.clone(),
+        artifact_type: "parsed_evidence".to_string(),
+        evidence: first_me.evidence.clone(),
+    };
+    let re_input_path = temp_path("idempotent_re_input.json");
+    tgraphy_core::io::write_parsed_evidence(&re_input, &re_input_path)
+        .expect("write re-input should succeed");
+
+    let second_out = temp_path("idempotent_second.json");
+    transform_step(&re_input_path, &second_out).expect("re-transform should succeed");
+
+    let ArtifactKind::ModuleEvidence(second_me) =
+        tgraphy_core::io::read_artifact(&second_out).unwrap()
+    else {
+        panic!("expected module_evidence after re-transform");
+    };
+
+    assert_eq!(
+        first_me.module_bundles, second_me.module_bundles,
+        "module_bundles must be identical when transform is applied to the same evidence"
+    );
+
+    let _ = std::fs::remove_file(&first_out);
+    let _ = std::fs::remove_file(&re_input_path);
+    let _ = std::fs::remove_file(&second_out);
+}
+
+#[test]
+fn transform_module_bundles_cover_all_links_via_link_ref() {
+    let input = fixture("parsed_evidence/multi_module.json");
+    let output = temp_path("transform_link_ref.json");
+
+    transform_step(&input, &output).expect("transform should succeed");
+
+    let artifact = tgraphy_core::io::read_artifact(&output).expect("output should be readable");
+    let ArtifactKind::ModuleEvidence(me) = artifact else {
+        panic!("expected module_evidence artifact");
+    };
+
+    // Collect all link_refs produced by the transform.
+    let mut link_refs: Vec<String> = me
+        .module_bundles
+        .iter()
+        .flat_map(|b| b.tests.iter().map(|t| t.link_ref.clone()))
+        .collect();
+    link_refs.sort();
+
+    // The multi_module fixture has three links: link-ax, link-ay, link-by.
+    assert_eq!(
+        link_refs,
+        vec!["link-ax", "link-ay", "link-by"],
+        "every test_module_link must be covered by exactly one bundle test via link_ref"
+    );
+
+    let _ = std::fs::remove_file(&output);
+}
+
 // ── evaluate step: module_evidence input ──────────────────────────────────────
 
 #[test]
