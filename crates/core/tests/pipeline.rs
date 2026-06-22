@@ -3,7 +3,9 @@ mod support;
 use support::stub::{StubEvaluatorA, StubEvaluatorB, StubParser, StubReporter};
 use tgraphy_core::component::ComponentRegistry;
 use tgraphy_core::component::builtin::{BuiltinEvaluator, BuiltinParser, BuiltinReporter};
-use tgraphy_core::pipeline::{PipelineError, collect_step, evaluate_step, report_step};
+use tgraphy_core::pipeline::{
+    PipelineError, collect_step, evaluate_step, report_step, transform_step,
+};
 use tgraphy_core::{ArtifactKind, ComponentError};
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -29,7 +31,7 @@ fn builtin_registry() -> ComponentRegistry {
 // ── collect step ──────────────────────────────────────────────────────────────
 
 #[test]
-fn collect_writes_evidence_artifact() {
+fn collect_writes_parsed_evidence_artifact() {
     let registry = builtin_registry();
     let input = fixture("valid_evidence.json");
     let output = temp_path("collect_output.json");
@@ -38,7 +40,11 @@ fn collect_writes_evidence_artifact() {
     assert!(result.is_ok(), "collect should succeed: {:?}", result);
 
     let artifact = tgraphy_core::io::read_artifact(&output).expect("output should be readable");
-    assert!(matches!(artifact, ArtifactKind::Evidence(_)));
+    assert!(
+        matches!(artifact, ArtifactKind::ParsedEvidence(_)),
+        "collect should write parsed_evidence, got {:?}",
+        artifact
+    );
 
     let _ = std::fs::remove_file(&output);
 }
@@ -55,7 +61,7 @@ fn collect_overwrites_existing_output() {
     assert!(result.is_ok(), "collect should overwrite existing output");
 
     let artifact = tgraphy_core::io::read_artifact(&output).expect("output should be readable");
-    assert!(matches!(artifact, ArtifactKind::Evidence(_)));
+    assert!(matches!(artifact, ArtifactKind::ParsedEvidence(_)));
 
     let _ = std::fs::remove_file(&output);
 }
@@ -107,7 +113,6 @@ fn collect_does_not_fail_for_distinct_paths() {
     let input = fixture("valid_evidence.json");
     let output = temp_path("collect_distinct.json");
 
-    // Only check same-path detection; the step may fail for other reasons.
     if let Err(PipelineError::SamePath { .. }) = collect_step(&registry, "builtin", &input, &output)
     {
         panic!("distinct paths should not trigger SamePath error");
@@ -135,20 +140,160 @@ fn collect_fails_with_component_error_for_unsupported_parser() {
     );
 }
 
-// ── evaluate step: evidence input ─────────────────────────────────────────────
+// ── transform step ────────────────────────────────────────────────────────────
 
 #[test]
-fn evaluate_with_evidence_input_writes_assessed_artifact() {
-    let registry = builtin_registry();
+fn transform_writes_module_evidence_from_parsed_evidence() {
+    let input = fixture("parsed_evidence/valid.json");
+    let output = temp_path("transform_output.json");
+
+    let result = transform_step(&input, &output);
+    assert!(result.is_ok(), "transform should succeed: {:?}", result);
+
+    let artifact = tgraphy_core::io::read_artifact(&output).expect("output should be readable");
+    let ArtifactKind::ModuleEvidence(me) = artifact else {
+        panic!("expected module_evidence artifact");
+    };
+    assert_eq!(
+        me.module_bundles.len(),
+        1,
+        "should have one bundle per module"
+    );
+    assert_eq!(
+        me.module_bundles[0].tests.len(),
+        1,
+        "module should have one test entry from the link"
+    );
+
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn transform_preserves_evidence_data() {
+    let input = fixture("parsed_evidence/valid.json");
+    let output = temp_path("transform_preserves.json");
+
+    let original = tgraphy_core::io::read_artifact(&input).unwrap();
+    let ArtifactKind::ParsedEvidence(original_pe) = original else {
+        panic!()
+    };
+
+    transform_step(&input, &output).unwrap();
+
+    let result = tgraphy_core::io::read_artifact(&output).unwrap();
+    let ArtifactKind::ModuleEvidence(me) = result else {
+        panic!("expected module_evidence");
+    };
+    assert_eq!(
+        me.evidence, original_pe.evidence,
+        "evidence must be preserved through transform"
+    );
+
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn transform_rejects_legacy_evidence_with_stage_error() {
     let input = fixture("valid_evidence.json");
-    let output = temp_path("evaluate_from_evidence.json");
+    let output = temp_path("transform_reject_evidence.json");
+
+    let result = transform_step(&input, &output);
+    assert!(
+        matches!(
+            result,
+            Err(PipelineError::UnexpectedArtifactType {
+                found: "evidence",
+                ..
+            })
+        ),
+        "transform should reject evidence with UnexpectedArtifactType: {:?}",
+        result
+    );
+
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn transform_rejects_module_evidence_with_stage_error() {
+    let input = fixture("module_evidence/valid.json");
+    let output = temp_path("transform_reject_me.json");
+
+    let result = transform_step(&input, &output);
+    assert!(
+        matches!(
+            result,
+            Err(PipelineError::UnexpectedArtifactType {
+                found: "module_evidence",
+                ..
+            })
+        ),
+        "transform should reject module_evidence with UnexpectedArtifactType: {:?}",
+        result
+    );
+
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn transform_rejects_assessed_module_evidence_with_stage_error() {
+    let input = fixture("assessed_module_evidence/valid.json");
+    let output = temp_path("transform_reject_ame.json");
+
+    let result = transform_step(&input, &output);
+    assert!(
+        matches!(
+            result,
+            Err(PipelineError::UnexpectedArtifactType {
+                found: "assessed_module_evidence",
+                ..
+            })
+        ),
+        "transform should reject assessed_module_evidence with UnexpectedArtifactType: {:?}",
+        result
+    );
+
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn transform_fails_with_same_path() {
+    let path = fixture("parsed_evidence/valid.json");
+
+    let result = transform_step(&path, &path);
+    assert!(
+        matches!(result, Err(PipelineError::SamePath { .. })),
+        "transform with same input/output should fail with SamePath: {:?}",
+        result
+    );
+}
+
+#[test]
+fn transform_fails_with_io_error_for_missing_input() {
+    let input = temp_path("transform_missing.json");
+    let output = temp_path("transform_missing_out.json");
+
+    let result = transform_step(&input, &output);
+    assert!(
+        matches!(result, Err(PipelineError::Io(_))),
+        "missing input should produce IO error: {:?}",
+        result
+    );
+}
+
+// ── evaluate step: module_evidence input ──────────────────────────────────────
+
+#[test]
+fn evaluate_with_module_evidence_input_writes_assessed_module_evidence() {
+    let registry = builtin_registry();
+    let input = fixture("module_evidence/valid.json");
+    let output = temp_path("evaluate_from_module_evidence.json");
 
     let result = evaluate_step(&registry, "builtin", &input, &output);
     assert!(result.is_ok(), "evaluate should succeed: {:?}", result);
 
     let artifact = tgraphy_core::io::read_artifact(&output).expect("output should be readable");
-    let ArtifactKind::Assessed(assessed) = artifact else {
-        panic!("expected assessed artifact");
+    let ArtifactKind::AssessedModuleEvidence(assessed) = artifact else {
+        panic!("expected assessed_module_evidence artifact");
     };
     assert_eq!(assessed.assessment_layers.len(), 1);
 
@@ -156,40 +301,44 @@ fn evaluate_with_evidence_input_writes_assessed_artifact() {
 }
 
 #[test]
-fn evaluate_with_evidence_input_preserves_evidence_data() {
+fn evaluate_with_module_evidence_input_preserves_evidence_and_bundles() {
     let registry = builtin_registry();
-    let input = fixture("valid_evidence.json");
-    let output = temp_path("evaluate_preserves_evidence.json");
+    let input = fixture("module_evidence/valid.json");
+    let output = temp_path("evaluate_preserves_module_evidence.json");
 
     let original = tgraphy_core::io::read_artifact(&input).unwrap();
-    let ArtifactKind::Evidence(original_ev) = original else {
+    let ArtifactKind::ModuleEvidence(original_me) = original else {
         panic!()
     };
 
     evaluate_step(&registry, "builtin", &input, &output).unwrap();
 
     let result = tgraphy_core::io::read_artifact(&output).unwrap();
-    let ArtifactKind::Assessed(assessed) = result else {
-        panic!("expected assessed");
+    let ArtifactKind::AssessedModuleEvidence(assessed) = result else {
+        panic!("expected assessed_module_evidence");
     };
     assert_eq!(
-        assessed.evidence, original_ev.evidence,
-        "evidence data must be preserved"
+        assessed.evidence, original_me.evidence,
+        "evidence must be preserved"
+    );
+    assert_eq!(
+        assessed.module_bundles, original_me.module_bundles,
+        "module_bundles must be preserved"
     );
 
     let _ = std::fs::remove_file(&output);
 }
 
-// ── evaluate step: assessed input ─────────────────────────────────────────────
+// ── evaluate step: assessed_module_evidence input (chaining) ─────────────────
 
 #[test]
-fn evaluate_with_assessed_input_appends_layer() {
+fn evaluate_with_assessed_module_evidence_input_appends_layer() {
     let registry = builtin_registry();
-    let input = fixture("valid_assessed.json");
-    let output = temp_path("evaluate_from_assessed.json");
+    let input = fixture("assessed_module_evidence/valid.json");
+    let output = temp_path("evaluate_from_assessed_module_evidence.json");
 
     let original = tgraphy_core::io::read_artifact(&input).unwrap();
-    let ArtifactKind::Assessed(original_assessed) = original else {
+    let ArtifactKind::AssessedModuleEvidence(original_assessed) = original else {
         panic!()
     };
     let original_layer_count = original_assessed.assessment_layers.len();
@@ -197,38 +346,37 @@ fn evaluate_with_assessed_input_appends_layer() {
     evaluate_step(&registry, "builtin", &input, &output).unwrap();
 
     let result = tgraphy_core::io::read_artifact(&output).unwrap();
-    let ArtifactKind::Assessed(updated) = result else {
-        panic!("expected assessed");
+    let ArtifactKind::AssessedModuleEvidence(updated) = result else {
+        panic!("expected assessed_module_evidence");
     };
     assert_eq!(
         updated.assessment_layers.len(),
         original_layer_count + 1,
-        "evaluate should append exactly one new assessment layer"
+        "evaluate should append exactly one new finding layer"
     );
 
     let _ = std::fs::remove_file(&output);
 }
 
 #[test]
-fn evaluate_with_assessed_input_preserves_existing_layers() {
+fn evaluate_with_assessed_module_evidence_input_preserves_existing_layers() {
     let registry = builtin_registry();
-    let input = fixture("valid_assessed.json");
+    let input = fixture("assessed_module_evidence/valid.json");
     let output = temp_path("evaluate_preserves_layers.json");
 
     let original = tgraphy_core::io::read_artifact(&input).unwrap();
-    let ArtifactKind::Assessed(original_assessed) = original else {
+    let ArtifactKind::AssessedModuleEvidence(original_assessed) = original else {
         panic!()
     };
 
     evaluate_step(&registry, "builtin", &input, &output).unwrap();
 
     let result = tgraphy_core::io::read_artifact(&output).unwrap();
-    let ArtifactKind::Assessed(updated) = result else {
+    let ArtifactKind::AssessedModuleEvidence(updated) = result else {
         panic!()
     };
 
-    let original_layers = &original_assessed.assessment_layers;
-    for (i, layer) in original_layers.iter().enumerate() {
+    for (i, layer) in original_assessed.assessment_layers.iter().enumerate() {
         assert_eq!(
             updated.assessment_layers[i].id, layer.id,
             "existing layer {i} should be preserved"
@@ -238,7 +386,103 @@ fn evaluate_with_assessed_input_preserves_existing_layers() {
     let _ = std::fs::remove_file(&output);
 }
 
-// ── evaluate step: rejection and errors ───────────────────────────────────────
+#[test]
+fn evaluate_with_assessed_module_evidence_passes_existing_layers_to_evaluator() {
+    // StubEvaluatorA ignores input, but we verify the pipeline passes assessment_layers
+    // through by confirming the output contains both the original and new layers.
+    let registry = builtin_registry();
+    let input = fixture("assessed_module_evidence/valid.json");
+    let output = temp_path("evaluate_layers_passed.json");
+
+    let original = tgraphy_core::io::read_artifact(&input).unwrap();
+    let ArtifactKind::AssessedModuleEvidence(original_assessed) = original else {
+        panic!()
+    };
+
+    evaluate_step(&registry, "builtin", &input, &output).unwrap();
+
+    let result = tgraphy_core::io::read_artifact(&output).unwrap();
+    let ArtifactKind::AssessedModuleEvidence(updated) = result else {
+        panic!()
+    };
+
+    assert!(
+        updated.assessment_layers.len() > original_assessed.assessment_layers.len(),
+        "output must contain more layers than input"
+    );
+
+    let _ = std::fs::remove_file(&output);
+}
+
+// ── evaluate step: stage rejection tests ─────────────────────────────────────
+
+#[test]
+fn evaluate_rejects_parsed_evidence_with_stage_error() {
+    let registry = builtin_registry();
+    let input = fixture("parsed_evidence/valid.json");
+    let output = temp_path("evaluate_reject_parsed_evidence.json");
+
+    let result = evaluate_step(&registry, "builtin", &input, &output);
+    assert!(
+        matches!(
+            result,
+            Err(PipelineError::UnexpectedArtifactType {
+                found: "parsed_evidence",
+                ..
+            })
+        ),
+        "evaluate should reject parsed_evidence with UnexpectedArtifactType: {:?}",
+        result
+    );
+
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn evaluate_rejects_legacy_evidence_with_stage_error() {
+    let registry = builtin_registry();
+    let input = fixture("valid_evidence.json");
+    let output = temp_path("evaluate_reject_evidence.json");
+
+    let result = evaluate_step(&registry, "builtin", &input, &output);
+    assert!(
+        matches!(
+            result,
+            Err(PipelineError::UnexpectedArtifactType {
+                found: "evidence",
+                ..
+            })
+        ),
+        "evaluate should reject evidence with UnexpectedArtifactType: {:?}",
+        result
+    );
+
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn evaluate_rejects_legacy_assessed_artifact_with_stage_error() {
+    let registry = builtin_registry();
+    let input = fixture("valid_assessed.json");
+    let output = temp_path("evaluate_reject_assessed.json");
+
+    let result = evaluate_step(&registry, "builtin", &input, &output);
+    assert!(
+        matches!(
+            result,
+            Err(PipelineError::UnexpectedArtifactType {
+                found: "assessed_artifact",
+                ..
+            })
+        ),
+        "evaluate should reject assessed_artifact with UnexpectedArtifactType: {:?}",
+        result
+    );
+
+    let _ = std::fs::remove_file(&output);
+}
+
+// ── evaluate step: other error cases ─────────────────────────────────────────
 
 #[test]
 fn evaluate_rejects_invalid_json_input() {
@@ -267,7 +511,7 @@ fn evaluate_rejects_unknown_artifact_type() {
 
     std::fs::write(
         &input,
-        br#"{"schema_version":"0.0.1","artifact_type":"unknown_type","producer":{"name":"x","version":"0.1.0"},"evidence":{}}"#,
+        br#"{"schema_version":"0.0.1","artifact_type":"unknown_type","evidence":{}}"#,
     )
     .unwrap();
 
@@ -299,7 +543,7 @@ fn evaluate_fails_with_io_error_for_missing_input() {
 #[test]
 fn evaluate_fails_with_component_error_for_unsupported_evaluator() {
     let registry = builtin_registry();
-    let input = fixture("valid_evidence.json");
+    let input = fixture("module_evidence/valid.json");
     let output = temp_path("evaluate_unsupported.json");
 
     let result = evaluate_step(&registry, "nonexistent-evaluator", &input, &output);
@@ -318,7 +562,7 @@ fn evaluate_fails_with_component_error_for_unsupported_evaluator() {
 #[test]
 fn evaluate_fails_with_same_path() {
     let registry = builtin_registry();
-    let path = fixture("valid_evidence.json");
+    let path = fixture("module_evidence/valid.json");
 
     let result = evaluate_step(&registry, "builtin", &path, &path);
     assert!(
@@ -331,7 +575,7 @@ fn evaluate_fails_with_same_path() {
 #[test]
 fn evaluate_overwrites_existing_output() {
     let registry = builtin_registry();
-    let input = fixture("valid_evidence.json");
+    let input = fixture("module_evidence/valid.json");
     let output = temp_path("evaluate_overwrite.json");
 
     std::fs::write(&output, b"old content").unwrap();
@@ -340,7 +584,7 @@ fn evaluate_overwrites_existing_output() {
     assert!(result.is_ok(), "evaluate should overwrite existing output");
 
     let artifact = tgraphy_core::io::read_artifact(&output).expect("output should be readable");
-    assert!(matches!(artifact, ArtifactKind::Assessed(_)));
+    assert!(matches!(artifact, ArtifactKind::AssessedModuleEvidence(_)));
 
     let _ = std::fs::remove_file(&output);
 }
@@ -348,9 +592,9 @@ fn evaluate_overwrites_existing_output() {
 // ── report step ───────────────────────────────────────────────────────────────
 
 #[test]
-fn report_with_assessed_input_writes_output() {
+fn report_with_assessed_module_evidence_input_writes_output() {
     let registry = builtin_registry();
-    let input = fixture("valid_assessed.json");
+    let input = fixture("assessed_module_evidence/valid.json");
     let output = temp_path("report_output.txt");
 
     let result = report_step(&registry, "builtin", &input, &output);
@@ -361,15 +605,87 @@ fn report_with_assessed_input_writes_output() {
 }
 
 #[test]
-fn report_rejects_evidence_artifact_input() {
+fn report_rejects_legacy_evidence_artifact() {
     let registry = builtin_registry();
     let input = fixture("valid_evidence.json");
     let output = temp_path("report_reject_evidence.txt");
 
     let result = report_step(&registry, "builtin", &input, &output);
     assert!(
-        matches!(result, Err(PipelineError::UnexpectedArtifactType { .. })),
+        matches!(
+            result,
+            Err(PipelineError::UnexpectedArtifactType {
+                found: "evidence",
+                ..
+            })
+        ),
         "report should reject evidence artifact: {:?}",
+        result
+    );
+
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn report_rejects_legacy_assessed_artifact() {
+    let registry = builtin_registry();
+    let input = fixture("valid_assessed.json");
+    let output = temp_path("report_reject_assessed.txt");
+
+    let result = report_step(&registry, "builtin", &input, &output);
+    assert!(
+        matches!(
+            result,
+            Err(PipelineError::UnexpectedArtifactType {
+                found: "assessed_artifact",
+                ..
+            })
+        ),
+        "report should reject assessed_artifact: {:?}",
+        result
+    );
+
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn report_rejects_parsed_evidence_artifact() {
+    let registry = builtin_registry();
+    let input = fixture("parsed_evidence/valid.json");
+    let output = temp_path("report_reject_parsed_evidence.txt");
+
+    let result = report_step(&registry, "builtin", &input, &output);
+    assert!(
+        matches!(
+            result,
+            Err(PipelineError::UnexpectedArtifactType {
+                found: "parsed_evidence",
+                ..
+            })
+        ),
+        "report should reject parsed_evidence: {:?}",
+        result
+    );
+
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn report_rejects_module_evidence_artifact() {
+    let registry = builtin_registry();
+    let input = fixture("module_evidence/valid.json");
+    let output = temp_path("report_reject_module_evidence.txt");
+
+    let result = report_step(&registry, "builtin", &input, &output);
+    assert!(
+        matches!(
+            result,
+            Err(PipelineError::UnexpectedArtifactType {
+                found: "module_evidence",
+                ..
+            })
+        ),
+        "report should reject module_evidence: {:?}",
         result
     );
 
@@ -412,7 +728,7 @@ fn report_fails_with_io_error_for_missing_input() {
 #[test]
 fn report_fails_with_component_error_for_unsupported_reporter() {
     let registry = builtin_registry();
-    let input = fixture("valid_assessed.json");
+    let input = fixture("assessed_module_evidence/valid.json");
     let output = temp_path("report_unsupported.txt");
 
     let result = report_step(&registry, "nonexistent-reporter", &input, &output);
@@ -431,7 +747,7 @@ fn report_fails_with_component_error_for_unsupported_reporter() {
 #[test]
 fn report_fails_with_same_path() {
     let registry = builtin_registry();
-    let path = fixture("valid_assessed.json");
+    let path = fixture("assessed_module_evidence/valid.json");
 
     let result = report_step(&registry, "builtin", &path, &path);
     assert!(
@@ -444,7 +760,7 @@ fn report_fails_with_same_path() {
 #[test]
 fn report_overwrites_existing_output() {
     let registry = builtin_registry();
-    let input = fixture("valid_assessed.json");
+    let input = fixture("assessed_module_evidence/valid.json");
     let output = temp_path("report_overwrite.txt");
 
     std::fs::write(&output, b"old content").unwrap();
@@ -453,36 +769,6 @@ fn report_overwrites_existing_output() {
     assert!(result.is_ok(), "report should overwrite existing output");
 
     let _ = std::fs::remove_file(&output);
-}
-
-// ── end-to-end: collect → evaluate → report ───────────────────────────────────
-
-#[test]
-fn collect_evaluate_report_end_to_end() {
-    let registry = builtin_registry();
-    let source = fixture("valid_evidence.json");
-    let evidence_out = temp_path("e2e_evidence.json");
-    let assessed_out = temp_path("e2e_assessed.json");
-    let report_out = temp_path("e2e_report.txt");
-
-    collect_step(&registry, "builtin", &source, &evidence_out).expect("collect should succeed");
-
-    let evidence = tgraphy_core::io::read_artifact(&evidence_out).unwrap();
-    assert!(matches!(evidence, ArtifactKind::Evidence(_)));
-
-    evaluate_step(&registry, "builtin", &evidence_out, &assessed_out)
-        .expect("evaluate should succeed");
-
-    let assessed = tgraphy_core::io::read_artifact(&assessed_out).unwrap();
-    assert!(matches!(assessed, ArtifactKind::Assessed(_)));
-
-    report_step(&registry, "builtin", &assessed_out, &report_out).expect("report should succeed");
-
-    assert!(report_out.exists(), "report output file should exist");
-
-    let _ = std::fs::remove_file(&evidence_out);
-    let _ = std::fs::remove_file(&assessed_out);
-    let _ = std::fs::remove_file(&report_out);
 }
 
 // ── stub fixture components: pipeline integration ─────────────────────────────
@@ -510,123 +796,141 @@ fn read_json_file(path: &std::path::Path) -> serde_json::Value {
 }
 
 #[test]
-fn stub_collect_matches_evidence_fixture() {
+fn stub_collect_matches_parsed_evidence_fixture() {
     let registry = stub_registry();
     let input = fixture("valid_evidence.json");
-    let output = temp_path("stub_collect_evidence.json");
+    let output = temp_path("stub_collect_parsed_evidence.json");
 
     collect_step(&registry, "stub-parser", &input, &output).expect("stub collect should succeed");
 
     let actual = read_json_file(&output);
-    let expected = read_json_file(&pipeline_fixture("evidence.json"));
+    let expected = read_json_file(&pipeline_fixture("parsed_evidence.json"));
     assert_eq!(
         actual, expected,
-        "collect output should match evidence fixture"
+        "collect output should match parsed_evidence fixture"
     );
 
     let _ = std::fs::remove_file(&output);
 }
 
 #[test]
-fn stub_first_evaluate_matches_assessed_first_fixture() {
+fn stub_collect_transform_matches_module_evidence_from_stub_fixture() {
     let registry = stub_registry();
     let input = fixture("valid_evidence.json");
-    let evidence_out = temp_path("stub_first_ev.json");
-    let assessed_out = temp_path("stub_first_assessed.json");
+    let parsed_out = temp_path("stub_transform_parsed.json");
+    let module_out = temp_path("stub_transform_module.json");
 
-    collect_step(&registry, "stub-parser", &input, &evidence_out).expect("collect should succeed");
-    evaluate_step(&registry, "stub-evaluator-a", &evidence_out, &assessed_out)
-        .expect("first evaluate should succeed");
+    collect_step(&registry, "stub-parser", &input, &parsed_out).expect("collect should succeed");
+    transform_step(&parsed_out, &module_out).expect("transform should succeed");
 
-    let actual = read_json_file(&assessed_out);
-    let expected = read_json_file(&pipeline_fixture("assessed_first.json"));
+    let actual = read_json_file(&module_out);
+    let expected = read_json_file(&pipeline_fixture("module_evidence_from_stub.json"));
     assert_eq!(
         actual, expected,
-        "first evaluate output should match assessed_first fixture"
+        "collect+transform output should match module_evidence_from_stub fixture"
     );
 
-    let _ = std::fs::remove_file(&evidence_out);
-    let _ = std::fs::remove_file(&assessed_out);
+    let _ = std::fs::remove_file(&parsed_out);
+    let _ = std::fs::remove_file(&module_out);
 }
 
 #[test]
-fn stub_second_evaluate_matches_assessed_second_fixture() {
+fn stub_first_evaluate_matches_assessed_module_evidence_first_fixture() {
     let registry = stub_registry();
-    let input = fixture("valid_evidence.json");
-    let evidence_out = temp_path("stub_second_ev.json");
-    let first_out = temp_path("stub_second_first.json");
-    let second_out = temp_path("stub_second_assessed.json");
+    let input = fixture("module_evidence/valid.json");
+    let output = temp_path("stub_first_assessed_module.json");
 
-    collect_step(&registry, "stub-parser", &input, &evidence_out).expect("collect should succeed");
-    evaluate_step(&registry, "stub-evaluator-a", &evidence_out, &first_out)
+    evaluate_step(&registry, "stub-evaluator-a", &input, &output)
         .expect("first evaluate should succeed");
+
+    let actual = read_json_file(&output);
+    let expected = read_json_file(&pipeline_fixture("assessed_module_evidence_first.json"));
+    assert_eq!(
+        actual, expected,
+        "first evaluate output should match assessed_module_evidence_first fixture"
+    );
+
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn stub_second_evaluate_matches_assessed_module_evidence_second_fixture() {
+    let registry = stub_registry();
+    let first_out = temp_path("stub_second_first.json");
+    let second_out = temp_path("stub_second_assessed_module.json");
+
+    evaluate_step(
+        &registry,
+        "stub-evaluator-a",
+        &fixture("module_evidence/valid.json"),
+        &first_out,
+    )
+    .expect("first evaluate should succeed");
     evaluate_step(&registry, "stub-evaluator-b", &first_out, &second_out)
         .expect("second evaluate should succeed");
 
     let actual = read_json_file(&second_out);
-    let expected = read_json_file(&pipeline_fixture("assessed_second.json"));
+    let expected = read_json_file(&pipeline_fixture("assessed_module_evidence_second.json"));
     assert_eq!(
         actual, expected,
-        "second evaluate output should match assessed_second fixture"
+        "second evaluate output should match assessed_module_evidence_second fixture"
     );
 
-    let _ = std::fs::remove_file(&evidence_out);
     let _ = std::fs::remove_file(&first_out);
     let _ = std::fs::remove_file(&second_out);
 }
 
 #[test]
-fn stub_report_matches_report_fixture() {
+fn stub_report_matches_report_staged_fixture() {
     let registry = stub_registry();
-    let input = fixture("valid_evidence.json");
-    let evidence_out = temp_path("stub_report_ev.json");
     let first_out = temp_path("stub_report_first.json");
     let second_out = temp_path("stub_report_second.json");
-    let report_out = temp_path("stub_report.md");
+    let report_out = temp_path("stub_report_staged.md");
 
-    collect_step(&registry, "stub-parser", &input, &evidence_out).expect("collect should succeed");
-    evaluate_step(&registry, "stub-evaluator-a", &evidence_out, &first_out)
-        .expect("first evaluate should succeed");
+    evaluate_step(
+        &registry,
+        "stub-evaluator-a",
+        &fixture("module_evidence/valid.json"),
+        &first_out,
+    )
+    .expect("first evaluate should succeed");
     evaluate_step(&registry, "stub-evaluator-b", &first_out, &second_out)
         .expect("second evaluate should succeed");
     report_step(&registry, "stub-reporter", &second_out, &report_out)
         .expect("report should succeed");
 
     let actual = std::fs::read_to_string(&report_out).expect("report output should be readable");
-    let expected = std::fs::read_to_string(pipeline_fixture("report.md"))
-        .expect("report fixture should be readable");
+    let expected = std::fs::read_to_string(pipeline_fixture("report_staged.md"))
+        .expect("report_staged fixture should be readable");
     assert_eq!(
         actual, expected,
-        "report output should match report fixture"
+        "report output should match report_staged fixture"
     );
 
-    let _ = std::fs::remove_file(&evidence_out);
     let _ = std::fs::remove_file(&first_out);
     let _ = std::fs::remove_file(&second_out);
     let _ = std::fs::remove_file(&report_out);
 }
 
 #[test]
-fn stub_full_pipeline_collect_evaluate_evaluate_report() {
+fn stub_full_pipeline_evaluate_evaluate_report() {
     let registry = stub_registry();
-    let input = fixture("valid_evidence.json");
-    let evidence_out = temp_path("stub_e2e_evidence.json");
     let first_out = temp_path("stub_e2e_first.json");
     let second_out = temp_path("stub_e2e_second.json");
     let report_out = temp_path("stub_e2e_report.md");
 
-    collect_step(&registry, "stub-parser", &input, &evidence_out).expect("collect should succeed");
+    evaluate_step(
+        &registry,
+        "stub-evaluator-a",
+        &fixture("module_evidence/valid.json"),
+        &first_out,
+    )
+    .expect("first evaluate should succeed");
 
-    let ArtifactKind::Evidence(_) = tgraphy_core::io::read_artifact(&evidence_out).unwrap() else {
-        panic!("expected evidence artifact after collect");
-    };
-
-    evaluate_step(&registry, "stub-evaluator-a", &evidence_out, &first_out)
-        .expect("first evaluate should succeed");
-
-    let ArtifactKind::Assessed(ref first) = tgraphy_core::io::read_artifact(&first_out).unwrap()
+    let ArtifactKind::AssessedModuleEvidence(ref first) =
+        tgraphy_core::io::read_artifact(&first_out).unwrap()
     else {
-        panic!("expected assessed artifact after first evaluate");
+        panic!("expected assessed_module_evidence after first evaluate");
     };
     assert_eq!(first.assessment_layers.len(), 1);
     assert_eq!(first.assessment_layers[0].id, "stub-layer-a");
@@ -634,9 +938,10 @@ fn stub_full_pipeline_collect_evaluate_evaluate_report() {
     evaluate_step(&registry, "stub-evaluator-b", &first_out, &second_out)
         .expect("second evaluate should succeed");
 
-    let ArtifactKind::Assessed(ref second) = tgraphy_core::io::read_artifact(&second_out).unwrap()
+    let ArtifactKind::AssessedModuleEvidence(ref second) =
+        tgraphy_core::io::read_artifact(&second_out).unwrap()
     else {
-        panic!("expected assessed artifact after second evaluate");
+        panic!("expected assessed_module_evidence after second evaluate");
     };
     assert_eq!(second.assessment_layers.len(), 2);
     assert_eq!(second.assessment_layers[0].id, "stub-layer-a");
@@ -645,15 +950,71 @@ fn stub_full_pipeline_collect_evaluate_evaluate_report() {
         first.evidence, second.evidence,
         "evidence must be preserved across evaluations"
     );
+    assert_eq!(
+        first.module_bundles, second.module_bundles,
+        "module_bundles must be preserved across evaluations"
+    );
 
     report_step(&registry, "stub-reporter", &second_out, &report_out)
         .expect("report should succeed");
     assert!(report_out.exists(), "report output file should exist");
 
-    let _ = std::fs::remove_file(&evidence_out);
     let _ = std::fs::remove_file(&first_out);
     let _ = std::fs::remove_file(&second_out);
     let _ = std::fs::remove_file(&report_out);
+}
+
+#[test]
+fn collect_transform_evaluate_report_e2e() {
+    let registry = stub_registry();
+    let raw_input = fixture("valid_evidence.json");
+    let parsed = temp_path("e2e_parsed.json");
+    let module = temp_path("e2e_module.json");
+    let assessed1 = temp_path("e2e_assessed1.json");
+    let assessed2 = temp_path("e2e_assessed2.json");
+    let report = temp_path("e2e_report.md");
+
+    collect_step(&registry, "stub-parser", &raw_input, &parsed).expect("collect should succeed");
+    assert!(matches!(
+        tgraphy_core::io::read_artifact(&parsed).unwrap(),
+        ArtifactKind::ParsedEvidence(_)
+    ));
+
+    transform_step(&parsed, &module).expect("transform should succeed");
+    assert!(matches!(
+        tgraphy_core::io::read_artifact(&module).unwrap(),
+        ArtifactKind::ModuleEvidence(_)
+    ));
+
+    evaluate_step(&registry, "stub-evaluator-a", &module, &assessed1)
+        .expect("first evaluate should succeed");
+    let ArtifactKind::AssessedModuleEvidence(ref a1) =
+        tgraphy_core::io::read_artifact(&assessed1).unwrap()
+    else {
+        panic!("expected assessed_module_evidence after first evaluate");
+    };
+    assert_eq!(a1.assessment_layers.len(), 1);
+    assert_eq!(a1.assessment_layers[0].id, "stub-layer-a");
+
+    evaluate_step(&registry, "stub-evaluator-b", &assessed1, &assessed2)
+        .expect("second evaluate should succeed");
+    let ArtifactKind::AssessedModuleEvidence(ref a2) =
+        tgraphy_core::io::read_artifact(&assessed2).unwrap()
+    else {
+        panic!("expected assessed_module_evidence after second evaluate");
+    };
+    assert_eq!(a2.assessment_layers.len(), 2);
+    assert_eq!(a2.assessment_layers[0].id, "stub-layer-a");
+    assert_eq!(a2.assessment_layers[1].id, "stub-layer-b");
+
+    report_step(&registry, "stub-reporter", &assessed2, &report).expect("report should succeed");
+    assert!(report.exists(), "report output file should exist");
+
+    let _ = std::fs::remove_file(&parsed);
+    let _ = std::fs::remove_file(&module);
+    let _ = std::fs::remove_file(&assessed1);
+    let _ = std::fs::remove_file(&assessed2);
+    let _ = std::fs::remove_file(&report);
 }
 
 // ── error category distinction ────────────────────────────────────────────────
@@ -671,8 +1032,38 @@ fn pipeline_errors_are_distinct_types() {
     let component_err = PipelineError::Component(ComponentError::NotFoundComponent {
         message: "no such component".to_string(),
     });
+    let stage_err = PipelineError::UnexpectedArtifactType {
+        step: "evaluate",
+        expected: "module_evidence or assessed_module_evidence",
+        found: "parsed_evidence",
+    };
 
     assert!(matches!(io_err, PipelineError::Io(_)));
     assert!(matches!(artifact_err, PipelineError::ArtifactValidation(_)));
     assert!(matches!(component_err, PipelineError::Component(_)));
+    assert!(matches!(
+        stage_err,
+        PipelineError::UnexpectedArtifactType { .. }
+    ));
+}
+
+#[test]
+fn stage_error_is_distinct_from_artifact_validation_error() {
+    // Wrong-stage input produces UnexpectedArtifactType, not ArtifactValidation.
+    let registry = builtin_registry();
+    let input = fixture("parsed_evidence/valid.json");
+    let output = temp_path("stage_error_distinction.json");
+
+    let result = evaluate_step(&registry, "builtin", &input, &output);
+    assert!(
+        matches!(result, Err(PipelineError::UnexpectedArtifactType { .. })),
+        "wrong-stage input must produce UnexpectedArtifactType, not ArtifactValidation: {:?}",
+        result
+    );
+    assert!(
+        !matches!(result, Err(PipelineError::ArtifactValidation(_))),
+        "wrong-stage input must not produce ArtifactValidation"
+    );
+
+    let _ = std::fs::remove_file(&output);
 }

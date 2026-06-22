@@ -1,24 +1,19 @@
-use crate::artifact::layer::{AssessmentLayer, LayerProducer, LayerProducerKind};
+use crate::artifact::staged::{Evaluator as EvaluatorInfo, FindingLayer};
 use crate::component::ComponentResult;
 use crate::component::evaluator::{Evaluator, EvaluatorInput};
-use crate::validation::ACCEPTED_SCHEMA_VERSION;
 
 pub struct BuiltinEvaluator;
 
 impl Evaluator for BuiltinEvaluator {
-    fn evaluate(&self, _input: EvaluatorInput) -> ComponentResult<AssessmentLayer> {
-        Ok(AssessmentLayer {
-            schema_version: ACCEPTED_SCHEMA_VERSION.to_string(),
+    fn evaluate(&self, _input: EvaluatorInput) -> ComponentResult<FindingLayer> {
+        Ok(FindingLayer {
             id: "builtin-layer".to_string(),
-            producer: LayerProducer {
-                name: "builtin".to_string(),
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                kind: LayerProducerKind::Generic,
-                extra: Default::default(),
+            evaluator: EvaluatorInfo {
+                id: "builtin".to_string(),
+                version: Some(env!("CARGO_PKG_VERSION").to_string()),
             },
-            assessments: vec![],
-            diagnostics: None,
-            extensions: None,
+            findings: vec![],
+            summary: None,
         })
     }
 }

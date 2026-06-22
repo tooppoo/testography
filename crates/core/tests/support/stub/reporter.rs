@@ -12,12 +12,8 @@ impl Reporter for StubReporter {
             "".to_string(),
         ];
 
-        let test_count = artifact
-            .evidence
-            .test_cases
-            .as_deref()
-            .map_or(0, |t| t.len());
-        let module_count = artifact.evidence.modules.as_deref().map_or(0, |m| m.len());
+        let test_count = artifact.evidence.test_cases.len();
+        let module_count = artifact.evidence.modules.len();
         lines.push(format!("- test cases: {}", test_count));
         lines.push(format!("- modules: {}", module_count));
         lines.push("".to_string());
@@ -27,8 +23,8 @@ impl Reporter for StubReporter {
             lines.push("".to_string());
             lines.push(format!("### {}", layer.id));
             lines.push("".to_string());
-            for assessment in &layer.assessments {
-                lines.push(format!("- {}: {}", assessment.id, assessment.statement));
+            for finding in &layer.findings {
+                lines.push(format!("- {}: {}", finding.id, finding.message));
             }
         }
 

@@ -24,19 +24,25 @@ fn process_config(command: &str) -> ProcessConfig {
     }
 }
 
-fn minimal_evidence() -> tgraphy_core::EvidenceArtifact {
-    let json = r#"{"schema_version":"0.0.1","artifact_type":"evidence","producer":{"name":"x","version":"0.1.0"},"evidence":{}}"#;
+fn minimal_assessed_module_evidence() -> tgraphy_core::AssessedModuleEvidenceArtifact {
+    let json = r#"{"schema_version":"0.0.1","artifact_type":"assessed_module_evidence","evidence":{},"module_bundles":[],"assessment_layers":[]}"#;
     match tgraphy_core::parse_artifact(json).unwrap() {
-        ArtifactKind::Evidence(a) => a,
-        _ => panic!("expected evidence"),
+        ArtifactKind::AssessedModuleEvidence(a) => a,
+        _ => panic!("expected assessed_module_evidence"),
     }
 }
 
-fn minimal_assessed() -> tgraphy_core::AssessedArtifact {
-    let json = r#"{"schema_version":"0.0.1","artifact_type":"assessed_artifact","producer":{"name":"x","version":"0.1.0"},"evidence":{},"assessment_layers":[]}"#;
-    match tgraphy_core::parse_artifact(json).unwrap() {
-        ArtifactKind::Assessed(a) => a,
-        _ => panic!("expected assessed"),
+fn minimal_evaluator_input() -> EvaluatorInput {
+    use tgraphy_core::artifact::staged::StagedEvidence;
+    EvaluatorInput {
+        evidence: StagedEvidence {
+            test_cases: vec![],
+            modules: vec![],
+            test_module_links: vec![],
+        },
+        module_bundles: vec![],
+        assessment_layers: vec![],
+        config: None,
     }
 }
 
@@ -70,12 +76,12 @@ fn builtin_reporter_resolves_from_registry() {
 }
 
 #[test]
-fn builtin_parser_returns_evidence_artifact() {
+fn builtin_parser_returns_parsed_evidence_artifact() {
     let parser = BuiltinParser;
     let result = tgraphy_core::component::parser::Parser::parse(&parser, empty_parser_input());
     assert!(result.is_ok(), "builtin parser should produce a result");
     let artifact = result.unwrap();
-    assert_eq!(artifact.artifact_type, "evidence");
+    assert_eq!(artifact.artifact_type, "parsed_evidence");
 }
 
 // ── process adapter representation ───────────────────────────────────────────
@@ -194,13 +200,7 @@ fn process_evaluator_returns_structured_failure() {
     let evaluator = ProcessEvaluator {
         config: process_config("nonexistent-command"),
     };
-    let result = Evaluator::evaluate(
-        &evaluator,
-        EvaluatorInput {
-            artifact: minimal_evidence(),
-            config: None,
-        },
-    );
+    let result = Evaluator::evaluate(&evaluator, minimal_evaluator_input());
     assert!(
         matches!(result, Err(ComponentError::InternalError { .. })),
         "process evaluator should return InternalError before execution is implemented"
@@ -215,7 +215,7 @@ fn process_reporter_returns_structured_failure() {
     let result = Reporter::report(
         &reporter,
         ReporterInput {
-            artifact: minimal_assessed(),
+            artifact: minimal_assessed_module_evidence(),
             config: None,
         },
     );

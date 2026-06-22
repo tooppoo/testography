@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::artifact::EvidenceArtifact;
+use crate::artifact::ParsedEvidenceArtifact;
 
 use super::ComponentResult;
 
@@ -10,5 +10,5 @@ pub struct ParserInput {
 }
 
 pub trait Parser {
-    fn parse(&self, input: ParserInput) -> ComponentResult<EvidenceArtifact>;
+    fn parse(&self, input: ParserInput) -> ComponentResult<ParsedEvidenceArtifact>;
 }

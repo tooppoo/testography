@@ -1,9 +1,9 @@
-use crate::artifact::AssessedArtifact;
+use crate::artifact::AssessedModuleEvidenceArtifact;
 
 use super::ComponentResult;
 
 pub struct ReporterInput {
-    pub artifact: AssessedArtifact,
+    pub artifact: AssessedModuleEvidenceArtifact,
     pub config: Option<serde_json::Value>,
 }
 

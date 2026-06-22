@@ -1,27 +1,21 @@
-use tgraphy_core::EvidenceArtifact;
-use tgraphy_core::artifact::common::Producer;
+use tgraphy_core::ParsedEvidenceArtifact;
 use tgraphy_core::artifact::evidence::{
-    Assertion, AssertionStyle, Call, CallRole, Callee, Confidence, Evidence, LinkRelationship,
-    Module, ModuleKind, ResolutionStatus, Source, TestCase, TestModuleLink,
+    Assertion, AssertionStyle, Call, CallRole, Callee, Module, ModuleKind, ResolutionStatus,
+    Source, TestCase,
 };
+use tgraphy_core::artifact::staged::{StagedEvidence, StagedTestModuleLink};
 use tgraphy_core::component::{ComponentResult, Parser, ParserInput};
 use tgraphy_core::validation::ACCEPTED_SCHEMA_VERSION;
 
 pub struct StubParser;
 
 impl Parser for StubParser {
-    fn parse(&self, _input: ParserInput) -> ComponentResult<EvidenceArtifact> {
-        Ok(EvidenceArtifact {
+    fn parse(&self, _input: ParserInput) -> ComponentResult<ParsedEvidenceArtifact> {
+        Ok(ParsedEvidenceArtifact {
             schema_version: ACCEPTED_SCHEMA_VERSION.to_string(),
-            artifact_type: "evidence".to_string(),
-            producer: Producer {
-                name: "stub-parser".to_string(),
-                version: "0.0.0".to_string(),
-                kind: None,
-                extensions: None,
-            },
-            evidence: Evidence {
-                test_cases: Some(vec![TestCase {
+            artifact_type: "parsed_evidence".to_string(),
+            evidence: StagedEvidence {
+                test_cases: vec![TestCase {
                     id: "stub-test-001".to_string(),
                     name: "stub test case".to_string(),
                     source: Source {
@@ -62,8 +56,8 @@ impl Parser for StubParser {
                     mocks: None,
                     fixtures: None,
                     extensions: None,
-                }]),
-                modules: Some(vec![Module {
+                }],
+                modules: vec![Module {
                     id: "stub-module-001".to_string(),
                     kind: ModuleKind::Function,
                     path: Some("stub/subject.ts".to_string()),
@@ -71,22 +65,17 @@ impl Parser for StubParser {
                     container: None,
                     language: None,
                     extensions: None,
-                }]),
-                test_module_links: Some(vec![TestModuleLink {
-                    test_id: "stub-test-001".to_string(),
-                    module_id: "stub-module-001".to_string(),
-                    relationship: LinkRelationship::AssertionTarget,
-                    confidence: Confidence::High,
-                    basis: None,
-                    evidence_refs: Some(vec!["stub-call-001".to_string()]),
-                    extensions: None,
-                }]),
-                module_bundles: None,
-                extensions: None,
+                }],
+                test_module_links: vec![StagedTestModuleLink {
+                    id: "stub-link-001".to_string(),
+                    test_ref: "stub-test-001".to_string(),
+                    module_ref: "stub-module-001".to_string(),
+                    relationship: Some("assertion_target".to_string()),
+                    confidence: Some("high".to_string()),
+                    basis: vec![],
+                    evidence_refs: vec!["stub-call-001".to_string()],
+                }],
             },
-            diagnostics: None,
-            project: None,
-            extensions: None,
         })
     }
 }

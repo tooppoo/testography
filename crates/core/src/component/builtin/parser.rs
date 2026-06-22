@@ -1,6 +1,5 @@
-use crate::artifact::EvidenceArtifact;
-use crate::artifact::common::Producer;
-use crate::artifact::evidence::Evidence;
+use crate::artifact::ParsedEvidenceArtifact;
+use crate::artifact::staged::StagedEvidence;
 use crate::component::ComponentResult;
 use crate::component::parser::{Parser, ParserInput};
 use crate::validation::ACCEPTED_SCHEMA_VERSION;
@@ -8,26 +7,15 @@ use crate::validation::ACCEPTED_SCHEMA_VERSION;
 pub struct BuiltinParser;
 
 impl Parser for BuiltinParser {
-    fn parse(&self, _input: ParserInput) -> ComponentResult<EvidenceArtifact> {
-        Ok(EvidenceArtifact {
+    fn parse(&self, _input: ParserInput) -> ComponentResult<ParsedEvidenceArtifact> {
+        Ok(ParsedEvidenceArtifact {
             schema_version: ACCEPTED_SCHEMA_VERSION.to_string(),
-            artifact_type: "evidence".to_string(),
-            producer: Producer {
-                name: "builtin".to_string(),
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                kind: None,
-                extensions: None,
+            artifact_type: "parsed_evidence".to_string(),
+            evidence: StagedEvidence {
+                test_cases: vec![],
+                modules: vec![],
+                test_module_links: vec![],
             },
-            evidence: Evidence {
-                test_cases: None,
-                modules: None,
-                test_module_links: None,
-                module_bundles: None,
-                extensions: None,
-            },
-            diagnostics: None,
-            project: None,
-            extensions: None,
         })
     }
 }

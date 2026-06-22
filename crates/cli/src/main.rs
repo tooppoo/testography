@@ -4,7 +4,9 @@ use std::process;
 use clap::{Parser, Subcommand};
 use tgraphy_core::component::ComponentRegistry;
 use tgraphy_core::component::builtin::{BuiltinEvaluator, BuiltinParser, BuiltinReporter};
-use tgraphy_core::pipeline::{PipelineError, collect_step, evaluate_step, report_step};
+use tgraphy_core::pipeline::{
+    PipelineError, collect_step, evaluate_step, report_step, transform_step,
+};
 
 #[derive(Parser)]
 #[command(name = "tgraphy", about = "Testography pipeline CLI")]
@@ -15,7 +17,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Collect evidence using a parser
+    /// Collect evidence using a parser (produces parsed_evidence)
     Collect {
         #[arg(long)]
         parser: String,
@@ -24,7 +26,14 @@ enum Command {
         #[arg(long)]
         output: PathBuf,
     },
-    /// Evaluate an artifact using an evaluator
+    /// Transform parsed_evidence into module_evidence
+    Transform {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+    },
+    /// Evaluate module_evidence or assessed_module_evidence using an evaluator
     Evaluate {
         #[arg(long)]
         evaluator: String,
@@ -33,7 +42,7 @@ enum Command {
         #[arg(long)]
         output: PathBuf,
     },
-    /// Generate a report from an assessed artifact
+    /// Generate a report from assessed_module_evidence
     Report {
         #[arg(long)]
         reporter: String,
@@ -62,6 +71,7 @@ fn run() -> Result<(), PipelineError> {
             input,
             output,
         } => collect_step(&registry, &parser, &input, &output),
+        Command::Transform { input, output } => transform_step(&input, &output),
         Command::Evaluate {
             evaluator,
             input,
