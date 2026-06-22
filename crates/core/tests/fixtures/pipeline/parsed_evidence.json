@@ -1,0 +1,54 @@
+{
+    "schema_version": "0.0.1",
+    "artifact_type": "parsed_evidence",
+    "evidence": {
+        "test_cases": [
+            {
+                "id": "stub-test-001",
+                "name": "stub test case",
+                "source": {
+                    "file": "stub/test.ts"
+                },
+                "calls": [
+                    {
+                        "id": "stub-call-001",
+                        "role": "assertion_target_call",
+                        "callee": {
+                            "text": "stubFunction",
+                            "resolution_status": "unresolved"
+                        }
+                    }
+                ],
+                "assertions": [
+                    {
+                        "id": "stub-assertion-001",
+                        "style": "expect_matcher",
+                        "target_call_refs": [
+                            "stub-call-001"
+                        ]
+                    }
+                ]
+            }
+        ],
+        "modules": [
+            {
+                "id": "stub-module-001",
+                "kind": "function",
+                "path": "stub/subject.ts",
+                "qualified_name": "stubFunction"
+            }
+        ],
+        "test_module_links": [
+            {
+                "id": "stub-link-001",
+                "test_ref": "stub-test-001",
+                "module_ref": "stub-module-001",
+                "relationship": "assertion_target",
+                "confidence": "high",
+                "evidence_refs": [
+                    "stub-call-001"
+                ]
+            }
+        ]
+    }
+}

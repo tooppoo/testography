@@ -1,6 +1,9 @@
 use std::path::Path;
 
-use crate::artifact::{AssessedArtifact, EvidenceArtifact};
+use crate::artifact::{
+    AssessedArtifact, AssessedModuleEvidenceArtifact, EvidenceArtifact, ModuleEvidenceArtifact,
+    ParsedEvidenceArtifact,
+};
 use crate::validation::ArtifactError;
 use crate::{ArtifactKind, parse_artifact};
 
@@ -32,6 +35,24 @@ pub fn serialize_assessed(artifact: &AssessedArtifact) -> Result<Vec<u8>, Artifa
     Ok(bytes)
 }
 
+/// Serialize a ParsedEvidenceArtifact to deterministic pretty JSON.
+pub fn serialize_parsed_evidence(
+    artifact: &ParsedEvidenceArtifact,
+) -> Result<Vec<u8>, ArtifactError> {
+    let mut bytes = serde_json::to_vec_pretty(artifact).map_err(ArtifactError::ParseJson)?;
+    bytes.push(b'\n');
+    Ok(bytes)
+}
+
+/// Serialize an AssessedModuleEvidenceArtifact to deterministic pretty JSON.
+pub fn serialize_assessed_module_evidence(
+    artifact: &AssessedModuleEvidenceArtifact,
+) -> Result<Vec<u8>, ArtifactError> {
+    let mut bytes = serde_json::to_vec_pretty(artifact).map_err(ArtifactError::ParseJson)?;
+    bytes.push(b'\n');
+    Ok(bytes)
+}
+
 /// Write an EvidenceArtifact to a file as deterministic pretty JSON.
 pub fn write_evidence(artifact: &EvidenceArtifact, path: &Path) -> Result<(), ArtifactError> {
     let bytes = serialize_evidence(artifact)?;
@@ -41,5 +62,41 @@ pub fn write_evidence(artifact: &EvidenceArtifact, path: &Path) -> Result<(), Ar
 /// Write an AssessedArtifact to a file as deterministic pretty JSON.
 pub fn write_assessed(artifact: &AssessedArtifact, path: &Path) -> Result<(), ArtifactError> {
     let bytes = serialize_assessed(artifact)?;
+    write_bytes(path, &bytes)
+}
+
+/// Write a ParsedEvidenceArtifact to a file as deterministic pretty JSON.
+pub fn write_parsed_evidence(
+    artifact: &ParsedEvidenceArtifact,
+    path: &Path,
+) -> Result<(), ArtifactError> {
+    let bytes = serialize_parsed_evidence(artifact)?;
+    write_bytes(path, &bytes)
+}
+
+/// Serialize a ModuleEvidenceArtifact to deterministic pretty JSON.
+pub fn serialize_module_evidence(
+    artifact: &ModuleEvidenceArtifact,
+) -> Result<Vec<u8>, ArtifactError> {
+    let mut bytes = serde_json::to_vec_pretty(artifact).map_err(ArtifactError::ParseJson)?;
+    bytes.push(b'\n');
+    Ok(bytes)
+}
+
+/// Write a ModuleEvidenceArtifact to a file as deterministic pretty JSON.
+pub fn write_module_evidence(
+    artifact: &ModuleEvidenceArtifact,
+    path: &Path,
+) -> Result<(), ArtifactError> {
+    let bytes = serialize_module_evidence(artifact)?;
+    write_bytes(path, &bytes)
+}
+
+/// Write an AssessedModuleEvidenceArtifact to a file as deterministic pretty JSON.
+pub fn write_assessed_module_evidence(
+    artifact: &AssessedModuleEvidenceArtifact,
+    path: &Path,
+) -> Result<(), ArtifactError> {
+    let bytes = serialize_assessed_module_evidence(artifact)?;
     write_bytes(path, &bytes)
 }

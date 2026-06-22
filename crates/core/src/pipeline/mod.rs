@@ -1,11 +1,17 @@
 use std::path::{Component, Path, PathBuf};
 
-use crate::artifact::{AssessedArtifact, EvidenceArtifact};
+use crate::artifact::staged::{BundleTest, StagedEvidence, StagedModuleBundle};
+use crate::artifact::{
+    AssessedModuleEvidenceArtifact, ModuleEvidenceArtifact, ParsedEvidenceArtifact,
+};
 use crate::component::evaluator::EvaluatorInput;
 use crate::component::parser::ParserInput;
 use crate::component::reporter::ReporterInput;
 use crate::component::{ComponentError, ComponentRegistry};
-use crate::io::{read_artifact, write_assessed, write_bytes, write_evidence};
+use crate::io::{
+    read_artifact, write_assessed_module_evidence, write_bytes, write_module_evidence,
+    write_parsed_evidence,
+};
 use crate::validation::ArtifactError;
 use crate::{ArtifactKind, parse_artifact};
 
@@ -25,8 +31,9 @@ pub enum PipelineError {
     #[error("input and output resolve to the same path: {path:?}")]
     SamePath { path: PathBuf },
 
-    #[error("unexpected artifact type: expected {expected}, found {found}")]
+    #[error("pipeline stage contract error at {step}: expected {expected}, found {found}")]
     UnexpectedArtifactType {
+        step: &'static str,
         expected: &'static str,
         found: &'static str,
     },
@@ -70,50 +77,31 @@ fn check_same_path(input: &Path, output: &Path) -> Result<(), PipelineError> {
     Ok(())
 }
 
-fn validate_evidence(artifact: &EvidenceArtifact) -> Result<(), PipelineError> {
+fn validate_module_evidence(artifact: &ModuleEvidenceArtifact) -> Result<(), PipelineError> {
     let json = serde_json::to_string(artifact)
         .map_err(|e| PipelineError::ArtifactValidation(ArtifactError::ParseJson(e)))?;
     parse_artifact(&json).map_err(map_artifact_error)?;
     Ok(())
 }
 
-fn validate_assessed(artifact: &AssessedArtifact) -> Result<(), PipelineError> {
+fn validate_parsed_evidence(artifact: &ParsedEvidenceArtifact) -> Result<(), PipelineError> {
     let json = serde_json::to_string(artifact)
         .map_err(|e| PipelineError::ArtifactValidation(ArtifactError::ParseJson(e)))?;
     parse_artifact(&json).map_err(map_artifact_error)?;
     Ok(())
 }
 
-fn assessed_from_evidence(
-    evidence: &EvidenceArtifact,
-    layer: crate::artifact::AssessmentLayer,
-) -> AssessedArtifact {
-    AssessedArtifact {
-        schema_version: evidence.schema_version.clone(),
-        artifact_type: "assessed_artifact".to_string(),
-        producer: evidence.producer.clone(),
-        evidence: evidence.evidence.clone(),
-        assessment_layers: vec![layer],
-        diagnostics: evidence.diagnostics.clone(),
-        project: evidence.project.clone(),
-        extensions: evidence.extensions.clone(),
-    }
-}
-
-fn evidence_from_assessed(assessed: &AssessedArtifact) -> EvidenceArtifact {
-    EvidenceArtifact {
-        schema_version: assessed.schema_version.clone(),
-        artifact_type: "evidence".to_string(),
-        producer: assessed.producer.clone(),
-        evidence: assessed.evidence.clone(),
-        diagnostics: assessed.diagnostics.clone(),
-        project: assessed.project.clone(),
-        extensions: assessed.extensions.clone(),
-    }
+fn validate_assessed_module_evidence(
+    artifact: &AssessedModuleEvidenceArtifact,
+) -> Result<(), PipelineError> {
+    let json = serde_json::to_string(artifact)
+        .map_err(|e| PipelineError::ArtifactValidation(ArtifactError::ParseJson(e)))?;
+    parse_artifact(&json).map_err(map_artifact_error)?;
+    Ok(())
 }
 
 /// Run the collect step: invoke the named parser with `input`, validate the
-/// produced evidence artifact, and write it to `output`.
+/// produced parsed_evidence artifact, and write it to `output`.
 pub fn collect_step(
     registry: &ComponentRegistry,
     parser_name: &str,
@@ -131,20 +119,103 @@ pub fn collect_step(
         config: None,
     };
 
-    let evidence = parser
+    let artifact = parser
         .parse(parser_input)
         .map_err(PipelineError::Component)?;
 
-    validate_evidence(&evidence)?;
+    validate_parsed_evidence(&artifact)?;
 
-    write_evidence(&evidence, output).map_err(map_artifact_error)?;
+    write_parsed_evidence(&artifact, output).map_err(map_artifact_error)?;
 
     Ok(())
 }
 
-/// Run the evaluate step: read `input` (evidence or assessed artifact), invoke
-/// the named evaluator, append the returned assessment layer, and write an
-/// assessed artifact to `output`.
+/// Derive one bundle per module from the existing test-module links.
+fn derive_module_bundles(evidence: &StagedEvidence) -> Vec<StagedModuleBundle> {
+    evidence
+        .modules
+        .iter()
+        .map(|module| {
+            let tests = evidence
+                .test_module_links
+                .iter()
+                .filter(|link| link.module_ref == module.id)
+                .map(|link| BundleTest {
+                    test_ref: link.test_ref.clone(),
+                    link_ref: link.id.clone(),
+                })
+                .collect();
+            StagedModuleBundle {
+                module_ref: module.id.clone(),
+                tests,
+            }
+        })
+        .collect()
+}
+
+/// Run the transform step: read `input` (parsed_evidence), derive module bundles
+/// from existing test-module links, and write `module_evidence` to `output`.
+///
+/// Rejects all other artifact stages as pipeline stage contract errors.
+pub fn transform_step(input: &Path, output: &Path) -> Result<(), PipelineError> {
+    check_same_path(input, output)?;
+
+    let artifact = read_artifact(input).map_err(map_artifact_error)?;
+
+    let parsed = match artifact {
+        ArtifactKind::ParsedEvidence(p) => p,
+        ArtifactKind::Evidence(_) => {
+            return Err(PipelineError::UnexpectedArtifactType {
+                step: "transform",
+                expected: "parsed_evidence",
+                found: "evidence",
+            });
+        }
+        ArtifactKind::Assessed(_) => {
+            return Err(PipelineError::UnexpectedArtifactType {
+                step: "transform",
+                expected: "parsed_evidence",
+                found: "assessed_artifact",
+            });
+        }
+        ArtifactKind::ModuleEvidence(_) => {
+            return Err(PipelineError::UnexpectedArtifactType {
+                step: "transform",
+                expected: "parsed_evidence",
+                found: "module_evidence",
+            });
+        }
+        ArtifactKind::AssessedModuleEvidence(_) => {
+            return Err(PipelineError::UnexpectedArtifactType {
+                step: "transform",
+                expected: "parsed_evidence",
+                found: "assessed_module_evidence",
+            });
+        }
+    };
+
+    let module_bundles = derive_module_bundles(&parsed.evidence);
+
+    let module_evidence = ModuleEvidenceArtifact {
+        schema_version: parsed.schema_version,
+        artifact_type: "module_evidence".to_string(),
+        evidence: parsed.evidence,
+        module_bundles,
+    };
+
+    validate_module_evidence(&module_evidence)?;
+
+    write_module_evidence(&module_evidence, output).map_err(map_artifact_error)?;
+
+    Ok(())
+}
+
+/// Run the evaluate step: read `input` (module_evidence or assessed_module_evidence),
+/// invoke the named evaluator, append the returned finding layer, and write an
+/// assessed_module_evidence artifact to `output`.
+///
+/// Rejects parsed_evidence, evidence, and assessed_artifact as pipeline stage
+/// contract errors.
 pub fn evaluate_step(
     registry: &ComponentRegistry,
     evaluator_name: &str,
@@ -159,57 +230,74 @@ pub fn evaluate_step(
         .resolve_evaluator(evaluator_name)
         .map_err(PipelineError::Component)?;
 
-    let assessed = match artifact {
-        ArtifactKind::Evidence(ev) => {
-            let layer = evaluator
-                .evaluate(EvaluatorInput {
-                    artifact: ev.clone(),
-                    config: None,
-                })
-                .map_err(PipelineError::Component)?;
-            assessed_from_evidence(&ev, layer)
-        }
-        ArtifactKind::Assessed(ref assessed) => {
-            let ev = evidence_from_assessed(assessed);
-            let layer = evaluator
-                .evaluate(EvaluatorInput {
-                    artifact: ev,
-                    config: None,
-                })
-                .map_err(PipelineError::Component)?;
-            let mut updated = assessed.clone();
-            updated.assessment_layers.push(layer);
-            updated
-        }
+    let (schema_version, evidence, module_bundles, existing_layers) = match artifact {
+        ArtifactKind::ModuleEvidence(ref m) => (
+            m.schema_version.clone(),
+            m.evidence.clone(),
+            m.module_bundles.clone(),
+            vec![],
+        ),
+        ArtifactKind::AssessedModuleEvidence(ref a) => (
+            a.schema_version.clone(),
+            a.evidence.clone(),
+            a.module_bundles.clone(),
+            a.assessment_layers.clone(),
+        ),
         ArtifactKind::ParsedEvidence(_) => {
             return Err(PipelineError::UnexpectedArtifactType {
-                expected: "evidence or assessed_artifact",
+                step: "evaluate",
+                expected: "module_evidence or assessed_module_evidence",
                 found: "parsed_evidence",
             });
         }
-        ArtifactKind::ModuleEvidence(_) => {
+        ArtifactKind::Evidence(_) => {
             return Err(PipelineError::UnexpectedArtifactType {
-                expected: "evidence or assessed_artifact",
-                found: "module_evidence",
+                step: "evaluate",
+                expected: "module_evidence or assessed_module_evidence",
+                found: "evidence",
             });
         }
-        ArtifactKind::AssessedModuleEvidence(_) => {
+        ArtifactKind::Assessed(_) => {
             return Err(PipelineError::UnexpectedArtifactType {
-                expected: "evidence or assessed_artifact",
-                found: "assessed_module_evidence",
+                step: "evaluate",
+                expected: "module_evidence or assessed_module_evidence",
+                found: "assessed_artifact",
             });
         }
     };
 
-    validate_assessed(&assessed)?;
+    let new_layer = evaluator
+        .evaluate(EvaluatorInput {
+            evidence: evidence.clone(),
+            module_bundles: module_bundles.clone(),
+            assessment_layers: existing_layers.clone(),
+            config: None,
+        })
+        .map_err(PipelineError::Component)?;
 
-    write_assessed(&assessed, output).map_err(map_artifact_error)?;
+    let mut layers = existing_layers;
+    layers.push(new_layer);
+
+    let assessed = AssessedModuleEvidenceArtifact {
+        schema_version,
+        artifact_type: "assessed_module_evidence".to_string(),
+        evidence,
+        module_bundles,
+        assessment_layers: layers,
+    };
+
+    validate_assessed_module_evidence(&assessed)?;
+
+    write_assessed_module_evidence(&assessed, output).map_err(map_artifact_error)?;
 
     Ok(())
 }
 
-/// Run the report step: read `input` (must be an assessed artifact), invoke
+/// Run the report step: read `input` (must be assessed_module_evidence), invoke
 /// the named reporter, and write the rendered output to `output`.
+///
+/// Rejects parsed_evidence, module_evidence, evidence, and assessed_artifact as
+/// pipeline stage contract errors.
 pub fn report_step(
     registry: &ComponentRegistry,
     reporter_name: &str,
@@ -221,29 +309,33 @@ pub fn report_step(
     let artifact = read_artifact(input).map_err(map_artifact_error)?;
 
     let assessed = match artifact {
-        ArtifactKind::Assessed(a) => a,
+        ArtifactKind::AssessedModuleEvidence(a) => a,
         ArtifactKind::Evidence(_) => {
             return Err(PipelineError::UnexpectedArtifactType {
-                expected: "assessed_artifact",
+                step: "report",
+                expected: "assessed_module_evidence",
                 found: "evidence",
+            });
+        }
+        ArtifactKind::Assessed(_) => {
+            return Err(PipelineError::UnexpectedArtifactType {
+                step: "report",
+                expected: "assessed_module_evidence",
+                found: "assessed_artifact",
             });
         }
         ArtifactKind::ParsedEvidence(_) => {
             return Err(PipelineError::UnexpectedArtifactType {
-                expected: "assessed_artifact",
+                step: "report",
+                expected: "assessed_module_evidence",
                 found: "parsed_evidence",
             });
         }
         ArtifactKind::ModuleEvidence(_) => {
             return Err(PipelineError::UnexpectedArtifactType {
-                expected: "assessed_artifact",
+                step: "report",
+                expected: "assessed_module_evidence",
                 found: "module_evidence",
-            });
-        }
-        ArtifactKind::AssessedModuleEvidence(_) => {
-            return Err(PipelineError::UnexpectedArtifactType {
-                expected: "assessed_artifact",
-                found: "assessed_module_evidence",
             });
         }
     };

@@ -1,4 +1,5 @@
-use crate::artifact::{AssessmentLayer, EvidenceArtifact};
+use crate::artifact::ParsedEvidenceArtifact;
+use crate::artifact::staged::FindingLayer;
 
 use super::evaluator::{Evaluator, EvaluatorInput};
 use super::parser::{Parser, ParserInput};
@@ -15,7 +16,7 @@ pub struct ProcessParser {
 }
 
 impl Parser for ProcessParser {
-    fn parse(&self, _input: ParserInput) -> ComponentResult<EvidenceArtifact> {
+    fn parse(&self, _input: ParserInput) -> ComponentResult<ParsedEvidenceArtifact> {
         Err(ComponentError::InternalError {
             message: "process-based parser execution is not yet implemented".to_string(),
         })
@@ -27,7 +28,7 @@ pub struct ProcessEvaluator {
 }
 
 impl Evaluator for ProcessEvaluator {
-    fn evaluate(&self, _input: EvaluatorInput) -> ComponentResult<AssessmentLayer> {
+    fn evaluate(&self, _input: EvaluatorInput) -> ComponentResult<FindingLayer> {
         Err(ComponentError::InternalError {
             message: "process-based evaluator execution is not yet implemented".to_string(),
         })

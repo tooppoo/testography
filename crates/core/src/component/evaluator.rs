@@ -1,12 +1,14 @@
-use crate::artifact::{AssessmentLayer, EvidenceArtifact};
+use crate::artifact::staged::{FindingLayer, StagedEvidence, StagedModuleBundle};
 
 use super::ComponentResult;
 
 pub struct EvaluatorInput {
-    pub artifact: EvidenceArtifact,
+    pub evidence: StagedEvidence,
+    pub module_bundles: Vec<StagedModuleBundle>,
+    pub assessment_layers: Vec<FindingLayer>,
     pub config: Option<serde_json::Value>,
 }
 
 pub trait Evaluator {
-    fn evaluate(&self, input: EvaluatorInput) -> ComponentResult<AssessmentLayer>;
+    fn evaluate(&self, input: EvaluatorInput) -> ComponentResult<FindingLayer>;
 }
