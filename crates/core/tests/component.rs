@@ -39,6 +39,7 @@ fn minimal_evaluator_input() -> EvaluatorInput {
             test_cases: vec![],
             modules: vec![],
             test_module_links: vec![],
+            extensions: None,
         },
         module_bundles: vec![],
         assessment_layers: vec![],
@@ -184,15 +185,66 @@ fn component_error_is_distinct_from_artifact_error() {
 }
 
 #[test]
-fn process_parser_returns_structured_failure() {
+fn process_parser_returns_error_for_missing_command() {
     let parser = ProcessParser {
         config: process_config("nonexistent-command"),
     };
     let result = tgraphy_core::component::parser::Parser::parse(&parser, empty_parser_input());
     assert!(
         matches!(result, Err(ComponentError::InternalError { .. })),
-        "process parser should return InternalError before execution is implemented"
+        "missing command should return InternalError"
     );
+}
+
+#[test]
+fn process_parser_returns_error_for_non_zero_exit() {
+    let parser = ProcessParser {
+        config: ProcessConfig {
+            command: "sh".to_string(),
+            args: vec!["-c".to_string(), "exit 1".to_string()],
+        },
+    };
+    let result = tgraphy_core::component::parser::Parser::parse(&parser, empty_parser_input());
+    assert!(
+        matches!(result, Err(ComponentError::InternalError { .. })),
+        "non-zero exit should return InternalError"
+    );
+}
+
+#[test]
+fn process_parser_returns_error_for_invalid_json_output() {
+    let parser = ProcessParser {
+        config: ProcessConfig {
+            command: "sh".to_string(),
+            args: vec![
+                "-c".to_string(),
+                "cat > /dev/null; echo 'not json'".to_string(),
+            ],
+        },
+    };
+    let result = tgraphy_core::component::parser::Parser::parse(&parser, empty_parser_input());
+    assert!(
+        matches!(result, Err(ComponentError::InternalError { .. })),
+        "invalid JSON output should return InternalError"
+    );
+}
+
+#[test]
+fn process_parser_returns_parsed_evidence_for_valid_output() {
+    let minimal_json = r#"{"schema_version":"0.0.1","artifact_type":"parsed_evidence","evidence":{"test_cases":[],"modules":[],"test_module_links":[]}}"#;
+    let cmd = format!("cat > /dev/null; printf '%s' '{}'", minimal_json);
+    let parser = ProcessParser {
+        config: ProcessConfig {
+            command: "sh".to_string(),
+            args: vec!["-c".to_string(), cmd],
+        },
+    };
+    let result = tgraphy_core::component::parser::Parser::parse(&parser, empty_parser_input());
+    assert!(
+        result.is_ok(),
+        "valid JSON output should succeed: {result:?}"
+    );
+    assert_eq!(result.unwrap().artifact_type, "parsed_evidence");
 }
 
 #[test]

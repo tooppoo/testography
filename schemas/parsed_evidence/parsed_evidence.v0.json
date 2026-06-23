@@ -93,6 +93,10 @@
                     "items": {
                         "$ref": "#/$defs/test_module_link"
                     }
+                },
+                "extensions": {
+                    "additionalProperties": true,
+                    "type": "object"
                 }
             }
         },

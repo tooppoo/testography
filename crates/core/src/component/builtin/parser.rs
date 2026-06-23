@@ -15,6 +15,7 @@ impl Parser for BuiltinParser {
                 test_cases: vec![],
                 modules: vec![],
                 test_module_links: vec![],
+                extensions: None,
             },
         })
     }

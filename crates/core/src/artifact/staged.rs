@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use super::evidence::{Module, TestCase};
@@ -11,6 +13,8 @@ pub struct StagedEvidence {
     pub modules: Vec<Module>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub test_module_links: Vec<StagedTestModuleLink>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<BTreeMap<String, serde_json::Value>>,
 }
 
 /// A test-to-module link entry with a stable `id` for cross-referencing.

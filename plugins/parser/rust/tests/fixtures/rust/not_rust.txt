@@ -1,0 +1,4 @@
+#[test]
+fn ignored() {
+    this is not valid rust
+}
