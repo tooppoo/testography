@@ -67,7 +67,7 @@ jobs:
 
       - name: parse test cases
         run: >
-          target/release/tgraphy collect
-            --parser rust
-            --input ./crates/core/tests/artifact.rs
+          target/release/tgraphy collect \
+            --parser rust \
+            --input ./crates/core/tests/artifact.rs \
             --output ./tmp/result.json
