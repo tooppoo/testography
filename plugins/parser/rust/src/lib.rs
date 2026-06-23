@@ -1,22 +1,307 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::error::Error;
+use std::fmt;
 use std::path::Path;
+use std::path::PathBuf;
 
 use quote::ToTokens;
+use serde::{Deserialize, Serialize};
 
-use crate::artifact::ParsedEvidenceArtifact;
-use crate::artifact::evidence::{
-    ArtifactValue, Assertion, AssertionStyle, Call, CallRole, Callee, LiteralClass, Matcher,
-    Module, ModuleKind, Parameter, ResolutionStatus, Source, TestCase, ValueKind,
-};
-use crate::artifact::staged::{StagedEvidence, StagedTestModuleLink};
-use crate::component::parser::{Parser, ParserInput};
-use crate::component::{ComponentError, ComponentResult};
-use crate::validation::ACCEPTED_SCHEMA_VERSION;
+const ACCEPTED_SCHEMA_VERSION: &str = "0.0.1";
+
+#[derive(Debug)]
+pub struct ParserError {
+    message: String,
+}
+
+impl ParserError {
+    fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+}
+
+impl fmt::Display for ParserError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl Error for ParserError {}
+
+pub type ParserResult<T> = Result<T, ParserError>;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ParserInput {
+    pub source_paths: Vec<PathBuf>,
+    pub config: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ParsedEvidenceArtifact {
+    pub schema_version: String,
+    pub artifact_type: String,
+    pub evidence: StagedEvidence,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StagedEvidence {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub test_cases: Vec<TestCase>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub modules: Vec<Module>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub test_module_links: Vec<StagedTestModuleLink>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<BTreeMap<String, serde_json::Value>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StagedTestModuleLink {
+    pub id: String,
+    pub test_ref: String,
+    pub module_ref: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub relationship: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub confidence: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub basis: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TestCase {
+    pub id: String,
+    pub name: String,
+    pub source: Source,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suite: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub calls: Option<Vec<Call>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parameters: Option<Vec<Parameter>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assertions: Option<Vec<Assertion>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mocks: Option<Vec<serde_json::Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fixtures: Option<Vec<serde_json::Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<BTreeMap<String, serde_json::Value>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Source {
+    pub file: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub column: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<BTreeMap<String, serde_json::Value>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CallRole {
+    DirectCall,
+    AssertionTargetCall,
+    SetupCall,
+    FixtureCall,
+    HelperCall,
+    FactoryCall,
+    MockSetupCall,
+    UnknownCall,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResolutionStatus {
+    Resolved,
+    Unresolved,
+    Ambiguous,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Callee {
+    pub text: String,
+    pub resolution_status: ResolutionStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub confidence: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolved_module_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolved_symbol: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Call {
+    pub id: String,
+    pub role: CallRole,
+    pub callee: Callee,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<Source>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<BTreeMap<String, serde_json::Value>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ValueKind {
+    StringLiteral,
+    NumberLiteral,
+    BooleanLiteral,
+    NullLiteral,
+    UndefinedLiteral,
+    LanguageSpecificLiteral,
+    ObjectLiteral,
+    ArrayLiteral,
+    Identifier,
+    CallExpression,
+    MemberExpression,
+    TemplateLiteral,
+    Closure,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LiteralClass {
+    EmptyString,
+    WhitespaceString,
+    NonEmptyString,
+    Zero,
+    PositiveNumber,
+    NegativeNumber,
+    Integer,
+    Float,
+    EmptyArray,
+    NonEmptyArray,
+    EmptyObject,
+    NonEmptyObject,
+    Nullish,
+    True,
+    False,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ArtifactValue {
+    pub value_kind: ValueKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub literal_class: Option<LiteralClass>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub object_shape: Option<BTreeMap<String, Box<ArtifactValue>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub array_items: Option<Vec<Box<ArtifactValue>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub origin: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub syntax: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<BTreeMap<String, serde_json::Value>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Parameter {
+    pub id: String,
+    pub argument_index: u64,
+    pub value_kind: ValueKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub call_ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub literal_class: Option<LiteralClass>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub object_shape: Option<BTreeMap<String, ArtifactValue>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub array_items: Option<Vec<ArtifactValue>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub origin: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub syntax: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<BTreeMap<String, serde_json::Value>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AssertionStyle {
+    ExpectMatcher,
+    AssertFunction,
+    ShouldStyle,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Matcher {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<Vec<ArtifactValue>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Assertion {
+    pub id: String,
+    pub style: AssertionStyle,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub framework: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub matcher: Option<Matcher>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_call_refs: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_expression: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected: Option<ArtifactValue>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<Source>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<BTreeMap<String, serde_json::Value>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ModuleKind {
+    File,
+    Symbol,
+    Package,
+    Class,
+    Method,
+    Function,
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Module {
+    pub id: String,
+    pub kind: ModuleKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub qualified_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub container: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<BTreeMap<String, serde_json::Value>>,
+}
 
 pub struct RustParser;
 
-impl Parser for RustParser {
-    fn parse(&self, input: ParserInput) -> ComponentResult<ParsedEvidenceArtifact> {
+impl RustParser {
+    pub fn parse(&self, input: ParserInput) -> ParserResult<ParsedEvidenceArtifact> {
         let mut ctx = ParseContext::new();
         let mut source_paths = input.source_paths;
         source_paths.sort();
@@ -26,10 +311,12 @@ impl Parser for RustParser {
                 continue;
             }
 
-            let source =
-                std::fs::read_to_string(path).map_err(|err| ComponentError::ExecutionFailed {
-                    message: format!("failed to read Rust source {}: {err}", path.display()),
-                })?;
+            let source = std::fs::read_to_string(path).map_err(|err| {
+                ParserError::new(format!(
+                    "failed to read Rust source {}: {err}",
+                    path.display()
+                ))
+            })?;
             ctx.process_file(path, &source)?;
         }
 
@@ -109,9 +396,12 @@ impl ParseContext {
         }
     }
 
-    fn process_file(&mut self, path: &Path, source: &str) -> ComponentResult<()> {
-        let file = syn::parse_file(source).map_err(|err| ComponentError::ExecutionFailed {
-            message: format!("failed to parse Rust source {}: {err}", path.display()),
+    fn process_file(&mut self, path: &Path, source: &str) -> ParserResult<()> {
+        let file = syn::parse_file(source).map_err(|err| {
+            ParserError::new(format!(
+                "failed to parse Rust source {}: {err}",
+                path.display()
+            ))
         })?;
 
         let module_path = Vec::new();

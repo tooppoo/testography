@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use tgraphy_core::artifact::evidence::{LiteralClass, ResolutionStatus, ValueKind};
-use tgraphy_core::component::builtin::RustParser;
-use tgraphy_core::component::parser::{Parser, ParserInput};
+use tgraphy_parser_rust::{
+    LiteralClass, ParsedEvidenceArtifact, ParserInput, ResolutionStatus, RustParser, ValueKind,
+};
 
 fn fixture(name: &str) -> PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -10,15 +10,33 @@ fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
-fn run(paths: Vec<PathBuf>) -> tgraphy_core::ParsedEvidenceArtifact {
-    Parser::parse(
-        &RustParser,
-        ParserInput {
+fn run(paths: Vec<PathBuf>) -> ParsedEvidenceArtifact {
+    RustParser
+        .parse(ParserInput {
             source_paths: paths,
             config: None,
-        },
-    )
-    .unwrap()
+        })
+        .unwrap()
+}
+
+fn validate_parsed_evidence_schema(json: &str) -> Result<(), String> {
+    let schema_json: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../schemas/parsed_evidence/parsed_evidence.v0.json"
+    ))
+    .expect("schema JSON should parse");
+    let instance: serde_json::Value =
+        serde_json::from_str(json).expect("artifact JSON should parse");
+    let validator = jsonschema::validator_for(&schema_json)
+        .map_err(|err| format!("schema failed to compile: {err}"))?;
+    let errors = validator
+        .iter_errors(&instance)
+        .map(|err| err.to_string())
+        .collect::<Vec<_>>();
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("\n"))
+    }
 }
 
 #[test]
@@ -30,7 +48,7 @@ fn simple_assertion_produces_schema_valid_evidence() {
 
     let json = serde_json::to_string(&artifact).expect("should serialize");
     assert!(
-        tgraphy_core::parse_artifact(&json).is_ok(),
+        validate_parsed_evidence_schema(&json).is_ok(),
         "schema validation failed for {json}"
     );
 }
@@ -363,7 +381,7 @@ fn non_rust_paths_are_skipped() {
     assert!(artifact.evidence.test_cases.is_empty());
 }
 
-fn assert_call_diagnostic(call: &tgraphy_core::artifact::evidence::Call, expected_code: &str) {
+fn assert_call_diagnostic(call: &tgraphy_parser_rust::Call, expected_code: &str) {
     let diagnostics = call
         .extensions
         .as_ref()
@@ -378,13 +396,10 @@ fn assert_call_diagnostic(call: &tgraphy_core::artifact::evidence::Call, expecte
 
 #[test]
 fn missing_rust_file_is_reported_as_component_error() {
-    let result = Parser::parse(
-        &RustParser,
-        ParserInput {
-            source_paths: vec![fixture("missing.rs")],
-            config: None,
-        },
-    );
+    let result = RustParser.parse(ParserInput {
+        source_paths: vec![fixture("missing.rs")],
+        config: None,
+    });
 
     assert!(result.is_err());
     assert!(
@@ -395,13 +410,10 @@ fn missing_rust_file_is_reported_as_component_error() {
 
 #[test]
 fn parse_failure_is_reported_as_component_error() {
-    let result = Parser::parse(
-        &RustParser,
-        ParserInput {
-            source_paths: vec![fixture("parse_error.rs")],
-            config: None,
-        },
-    );
+    let result = RustParser.parse(ParserInput {
+        source_paths: vec![fixture("parse_error.rs")],
+        config: None,
+    });
 
     assert!(result.is_err());
     assert!(

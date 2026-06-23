@@ -969,10 +969,8 @@ name = "tgraphy-core"
 version = "0.0.1"
 dependencies = [
  "jsonschema",
- "quote",
  "serde",
  "serde_json",
- "syn",
  "thiserror",
 ]
 
@@ -980,8 +978,11 @@ dependencies = [
 name = "tgraphy-parser-rust"
 version = "0.0.1"
 dependencies = [
+ "jsonschema",
+ "quote",
+ "serde",
  "serde_json",
- "tgraphy-core",
+ "syn",
 ]
 
 [[package]]
