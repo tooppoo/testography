@@ -55,47 +55,49 @@ pub fn register_from_config(
         .parse()
         .map_err(|e: kdl::KdlError| ConfigError::InvalidKdl(e.to_string()))?;
 
-    let Some(components_node) = doc.get("components") else {
-        return Ok(());
-    };
-
-    let Some(children) = components_node.children() else {
-        return Ok(());
-    };
-
     let mut parser_names: HashSet<String> = HashSet::new();
 
-    for node in children.nodes() {
-        let kind = node.name().value();
-        if kind == "parser" {
-            let name = node
-                .entries()
-                .first()
-                .and_then(|e| e.value().as_string())
-                .ok_or_else(|| {
-                    ConfigError::InvalidKdl("parser node requires a name argument".to_string())
-                })?
-                .to_string();
+    for components_node in doc
+        .nodes()
+        .iter()
+        .filter(|n| n.name().value() == "components")
+    {
+        let Some(children) = components_node.children() else {
+            continue;
+        };
 
-            if !parser_names.insert(name.clone()) {
-                return Err(ConfigError::DuplicateName {
-                    kind: "parser".to_string(),
-                    name,
-                });
+        for node in children.nodes() {
+            let kind = node.name().value();
+            if kind == "parser" {
+                let name = node
+                    .entries()
+                    .first()
+                    .and_then(|e| e.value().as_string())
+                    .ok_or_else(|| {
+                        ConfigError::InvalidKdl("parser node requires a name argument".to_string())
+                    })?
+                    .to_string();
+
+                if !parser_names.insert(name.clone()) {
+                    return Err(ConfigError::DuplicateName {
+                        kind: "parser".to_string(),
+                        name,
+                    });
+                }
+
+                let process = parse_process_block(node, "parser", &name)?;
+                let command = resolve_command(worktree_root, process.command);
+
+                registry.register_parser(
+                    &name,
+                    Box::new(ProcessParser {
+                        config: ProcessConfig {
+                            command,
+                            args: process.args,
+                        },
+                    }),
+                );
             }
-
-            let process = parse_process_block(node, "parser", &name)?;
-            let command = resolve_command(worktree_root, process.command);
-
-            registry.register_parser(
-                &name,
-                Box::new(ProcessParser {
-                    config: ProcessConfig {
-                        command,
-                        args: process.args,
-                    },
-                }),
-            );
         }
     }
 
@@ -332,5 +334,56 @@ mod tests {
         let mut registry = ComponentRegistry::new();
         register_from_config(&mut registry, dir.path()).expect("load config");
         assert!(registry.resolve_parser("rust").is_ok());
+    }
+
+    #[test]
+    fn parsers_from_multiple_components_blocks_are_all_registered() {
+        let dir = make_config_dir(
+            r#"components {
+  parser "rust" {
+    process { command "/usr/bin/rust-parser" args }
+  }
+}
+components {
+  parser "go" {
+    process { command "/usr/bin/go-parser" args }
+  }
+}"#,
+        );
+
+        let mut registry = ComponentRegistry::new();
+        register_from_config(&mut registry, dir.path()).expect("load config");
+
+        assert!(
+            registry.resolve_parser("rust").is_ok(),
+            "rust should be registered"
+        );
+        assert!(
+            registry.resolve_parser("go").is_ok(),
+            "go should be registered"
+        );
+    }
+
+    #[test]
+    fn duplicate_name_across_components_blocks_is_error() {
+        let dir = make_config_dir(
+            r#"components {
+  parser "rust" {
+    process { command "/usr/bin/a" args }
+  }
+}
+components {
+  parser "rust" {
+    process { command "/usr/bin/b" args }
+  }
+}"#,
+        );
+
+        let mut registry = ComponentRegistry::new();
+        let err = register_from_config(&mut registry, dir.path()).expect_err("should error");
+        assert!(
+            matches!(&err, ConfigError::DuplicateName { kind, name } if kind == "parser" && name == "rust"),
+            "unexpected error: {err}"
+        );
     }
 }
