@@ -969,8 +969,10 @@ name = "tgraphy-core"
 version = "0.0.1"
 dependencies = [
  "jsonschema",
+ "quote",
  "serde",
  "serde_json",
+ "syn",
  "thiserror",
 ]
 
