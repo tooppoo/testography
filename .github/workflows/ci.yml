@@ -13,8 +13,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  rust:
-    name: Rust
+  test:
+    name: Test
     runs-on: ubuntu-latest
 
     steps:
@@ -43,3 +43,31 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }} # required for private repos or protected branches
           files: cov.json
           fail_ci_if_error: true
+  walkthrogh:
+    name: Walkthrough
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Setup
+        run: make setup
+      - name: Build
+        run: make build-release
+
+      - name: parse test cases
+        run:
+          target/release/tgraphy collect \
+            --parser rust \
+            --input ./crates/core/tests/artifact.rs \
+            --output ./tmp/result.json

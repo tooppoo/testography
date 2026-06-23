@@ -35,3 +35,6 @@ setup:
 .PHONY: build
 build:
 		cargo build --locked
+.PHONY: build-release
+build-release:
+		cargo build --release --locked
