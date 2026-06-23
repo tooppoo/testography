@@ -6,3 +6,4 @@ cov.json
 
 # local
 *.local.json
+/tmp
