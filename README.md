@@ -564,6 +564,47 @@ tgraphy run
 }
 ```
 
+## Component configuration
+
+Process-based components such as parsers are registered through a `testography.kdl` file at the root of the current Git worktree.
+
+### Minimal example
+
+```kdl
+components {
+  parser "rust" {
+    process {
+      command "./target/debug/tgraphy-parser-rust"
+      args
+    }
+  }
+}
+```
+
+### With arguments
+
+```kdl
+components {
+  parser "rust" {
+    process {
+      command "./target/debug/tgraphy-parser-rust"
+      args "--example" "value"
+    }
+  }
+}
+```
+
+- `command` is required. Relative paths are resolved from the Git worktree root.
+- `args` specifies argv values for the process. Omitting `args` or leaving it empty is equivalent to passing no arguments.
+
+Once `testography.kdl` is in place, the named component is available through the usual CLI flags:
+
+```sh
+tgraphy collect --parser rust --input tests/ --output evidence.json
+```
+
+If a config-defined component has the same name as a built-in component, the config-defined component takes precedence.
+
 ## MVP scope
 
 Initial scope:
