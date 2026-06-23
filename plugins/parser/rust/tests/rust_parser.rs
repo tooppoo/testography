@@ -489,3 +489,75 @@ fn top_level_macro_produces_diagnostic_on_evidence_extensions() {
         "diagnostic message should mention the macro name"
     );
 }
+
+#[test]
+fn assertion_inside_for_loop_is_detected() {
+    let artifact = run(vec![fixture("for_loop_assertion.rs")]);
+    let evidence = &artifact.evidence;
+
+    assert_eq!(evidence.test_cases.len(), 1);
+    let tc = &evidence.test_cases[0];
+    assert_eq!(tc.name, "test_add_in_loop");
+
+    let calls = tc.calls.as_ref().expect("should have calls");
+    assert_eq!(calls[0].callee.text, "add");
+    assert_eq!(
+        calls[0].callee.resolution_status,
+        ResolutionStatus::Resolved
+    );
+
+    let assertions = tc.assertions.as_ref().expect("should have assertions");
+    assert_eq!(assertions.len(), 1);
+    assert_eq!(
+        assertions[0]
+            .matcher
+            .as_ref()
+            .and_then(|m| m.name.as_deref()),
+        Some("assert_eq")
+    );
+}
+
+#[test]
+fn negative_integer_literal_classified_as_negative_number() {
+    let artifact = run(vec![fixture("negative_literal.rs")]);
+    let evidence = &artifact.evidence;
+
+    let int_tc = evidence
+        .test_cases
+        .iter()
+        .find(|tc| tc.name == "test_negate_positive")
+        .expect("test_negate_positive should be present");
+
+    let assertions = int_tc.assertions.as_ref().expect("should have assertions");
+    assert_eq!(
+        assertions[0]
+            .expected
+            .as_ref()
+            .and_then(|v| v.literal_class.clone()),
+        Some(LiteralClass::NegativeNumber)
+    );
+}
+
+#[test]
+fn negative_float_literal_classified_as_float() {
+    let artifact = run(vec![fixture("negative_literal.rs")]);
+    let evidence = &artifact.evidence;
+
+    let float_tc = evidence
+        .test_cases
+        .iter()
+        .find(|tc| tc.name == "test_negate_float")
+        .expect("test_negate_float should be present");
+
+    let assertions = float_tc
+        .assertions
+        .as_ref()
+        .expect("should have assertions");
+    assert_eq!(
+        assertions[0]
+            .expected
+            .as_ref()
+            .and_then(|v| v.literal_class.clone()),
+        Some(LiteralClass::Float)
+    );
+}

@@ -563,6 +563,21 @@ impl ParseContext {
                     self.process_expr(else_expr, use_map, module_path, evidence);
                 }
             }
+            syn::Expr::ForLoop(for_loop) => {
+                self.process_block(&for_loop.body, use_map, module_path, evidence);
+            }
+            syn::Expr::While(while_expr) => {
+                self.process_expr(&while_expr.cond, use_map, module_path, evidence);
+                self.process_block(&while_expr.body, use_map, module_path, evidence);
+            }
+            syn::Expr::Loop(loop_expr) => {
+                self.process_block(&loop_expr.body, use_map, module_path, evidence);
+            }
+            syn::Expr::Match(match_expr) => {
+                for arm in &match_expr.arms {
+                    self.process_expr(&arm.body, use_map, module_path, evidence);
+                }
+            }
             _ => {}
         }
     }
@@ -869,6 +884,48 @@ fn normalize_super_path(text: &str, module_path: &[String]) -> Option<String> {
 fn extract_artifact_value(expr: &syn::Expr) -> ArtifactValue {
     match peel_parens(expr) {
         syn::Expr::Lit(lit) => literal_value(&lit.lit, Some(expr_to_string(expr))),
+        syn::Expr::Unary(unary) if matches!(unary.op, syn::UnOp::Neg(_)) => {
+            match peel_parens(&unary.expr) {
+                syn::Expr::Lit(lit) => match &lit.lit {
+                    syn::Lit::Int(_) => ArtifactValue {
+                        value_kind: ValueKind::NumberLiteral,
+                        literal_class: Some(LiteralClass::NegativeNumber),
+                        object_shape: None,
+                        array_items: None,
+                        origin: None,
+                        syntax: Some(expr_to_string(expr)),
+                        extensions: None,
+                    },
+                    syn::Lit::Float(_) => ArtifactValue {
+                        value_kind: ValueKind::NumberLiteral,
+                        literal_class: Some(LiteralClass::Float),
+                        object_shape: None,
+                        array_items: None,
+                        origin: None,
+                        syntax: Some(expr_to_string(expr)),
+                        extensions: None,
+                    },
+                    _ => ArtifactValue {
+                        value_kind: ValueKind::Unknown,
+                        literal_class: None,
+                        object_shape: None,
+                        array_items: None,
+                        origin: None,
+                        syntax: Some(expr_to_string(expr)),
+                        extensions: None,
+                    },
+                },
+                _ => ArtifactValue {
+                    value_kind: ValueKind::Unknown,
+                    literal_class: None,
+                    object_shape: None,
+                    array_items: None,
+                    origin: None,
+                    syntax: Some(expr_to_string(expr)),
+                    extensions: None,
+                },
+            }
+        }
         syn::Expr::Array(array) if array.elems.is_empty() => ArtifactValue {
             value_kind: ValueKind::ArrayLiteral,
             literal_class: Some(LiteralClass::EmptyArray),
