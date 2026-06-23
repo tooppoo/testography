@@ -66,8 +66,8 @@ jobs:
         run: make build-release
 
       - name: parse test cases
-        run:
-          target/release/tgraphy collect \
-            --parser rust \
-            --input ./crates/core/tests/artifact.rs \
+        run: >
+          target/release/tgraphy collect
+            --parser rust
+            --input ./crates/core/tests/artifact.rs
             --output ./tmp/result.json
