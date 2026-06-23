@@ -509,6 +509,30 @@ fn resolve_callee(
         return (ResolutionStatus::Resolved, Some(normalized));
     }
 
+    // Prefix-qualified call: `use crate::math; math::add(1, 2)`.
+    // If the first path segment maps to a crate-rooted path in use_map,
+    // append the remaining segments to form the full qualified name.
+    if let Some((first, rest)) = text.split_once("::") {
+        if let Some(prefix_qname) = use_map.get(first)
+            && prefix_qname.starts_with("crate::")
+        {
+            return (
+                ResolutionStatus::Resolved,
+                Some(format!("{prefix_qname}::{rest}")),
+            );
+        }
+
+        if let Some(prefix_qname) = use_map.get(first)
+            && prefix_qname.starts_with("super::")
+            && let Some(normalized_prefix) = normalize_super_path(prefix_qname, module_path)
+        {
+            return (
+                ResolutionStatus::Resolved,
+                Some(format!("{normalized_prefix}::{rest}")),
+            );
+        }
+    }
+
     (ResolutionStatus::Unresolved, None)
 }
 

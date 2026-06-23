@@ -417,3 +417,28 @@ fn empty_input_produces_empty_evidence() {
     assert!(artifact.evidence.modules.is_empty());
     assert!(artifact.evidence.test_module_links.is_empty());
 }
+
+#[test]
+fn prefix_qualified_call_resolves_via_module_use_import() {
+    // `use crate::calculator;` followed by `calculator::add(...)` should resolve
+    // to `crate::calculator::add`, not remain unresolved.
+    let artifact = run(vec![fixture("prefix_qualified_call.rs")]);
+    let evidence = &artifact.evidence;
+
+    assert_eq!(evidence.test_cases.len(), 1);
+
+    let calls = evidence.test_cases[0]
+        .calls
+        .as_ref()
+        .expect("should have calls");
+    assert_eq!(calls[0].callee.text, "calculator::add");
+    assert_eq!(
+        calls[0].callee.resolution_status,
+        ResolutionStatus::Resolved
+    );
+    assert_eq!(
+        evidence.modules[0].qualified_name.as_deref(),
+        Some("crate::calculator::add")
+    );
+    assert_eq!(evidence.test_module_links.len(), 1);
+}
