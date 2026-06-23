@@ -47,6 +47,7 @@ struct ParseContext {
     modules: Vec<Module>,
     test_module_links: Vec<StagedTestModuleLink>,
     module_by_qname: BTreeMap<String, String>,
+    file_diagnostics: Vec<ParserDiagnostic>,
 }
 
 struct TestEvidence {
@@ -70,6 +71,7 @@ impl ParseContext {
             modules: Vec::new(),
             test_module_links: Vec::new(),
             module_by_qname: BTreeMap::new(),
+            file_diagnostics: Vec::new(),
         }
     }
 
@@ -103,6 +105,7 @@ impl ParseContext {
             test_cases: self.test_cases,
             modules: self.modules,
             test_module_links: self.test_module_links,
+            extensions: diagnostics_extensions(&self.file_diagnostics),
         }
     }
 
@@ -135,6 +138,18 @@ impl ParseContext {
                         nested_path.push(m.ident.to_string());
                         self.process_items(path, nested_items, &nested_path);
                     }
+                }
+                // Top-level macro invocations (e.g. generate_tests!()) cannot be
+                // expanded statically; record a diagnostic so the output is not silent.
+                syn::Item::Macro(item_mac) => {
+                    let name = macro_name(&item_mac.mac).unwrap_or_else(|| "<unknown>".to_string());
+                    self.file_diagnostics.push(ParserDiagnostic {
+                        code: "rust_parser.unexpanded_macro",
+                        message: format!(
+                            "top-level macro {name}! was not expanded; \
+                             tests it generates will not be recorded"
+                        ),
+                    });
                 }
                 _ => {}
             }

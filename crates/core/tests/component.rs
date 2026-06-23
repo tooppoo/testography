@@ -39,6 +39,7 @@ fn minimal_evaluator_input() -> EvaluatorInput {
             test_cases: vec![],
             modules: vec![],
             test_module_links: vec![],
+            extensions: None,
         },
         module_bundles: vec![],
         assessment_layers: vec![],

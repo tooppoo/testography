@@ -442,3 +442,38 @@ fn prefix_qualified_call_resolves_via_module_use_import() {
     );
     assert_eq!(evidence.test_module_links.len(), 1);
 }
+
+#[test]
+fn top_level_macro_produces_diagnostic_on_evidence_extensions() {
+    // A file-level macro like `generate_tests!(...)` cannot be statically
+    // expanded; it should produce a diagnostic in evidence.extensions, not
+    // silently disappear.
+    let artifact = run(vec![fixture("top_level_macro.rs")]);
+    let evidence = &artifact.evidence;
+
+    // The explicit #[test] fn is still captured normally.
+    assert_eq!(evidence.test_cases.len(), 1);
+    assert_eq!(evidence.test_cases[0].name, "explicit_test");
+
+    // The unexpanded macro should be recorded as a diagnostic on the evidence.
+    let extensions = evidence
+        .extensions
+        .as_ref()
+        .expect("evidence should have extensions");
+    let diagnostics = extensions
+        .get("diagnostics")
+        .and_then(|v| v.as_array())
+        .expect("extensions should contain a diagnostics array");
+    assert_eq!(
+        diagnostics[0].get("code").and_then(|v| v.as_str()),
+        Some("rust_parser.unexpanded_macro")
+    );
+    assert!(
+        diagnostics[0]
+            .get("message")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .contains("generate_tests"),
+        "diagnostic message should mention the macro name"
+    );
+}

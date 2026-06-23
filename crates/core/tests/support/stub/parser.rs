@@ -75,6 +75,7 @@ impl Parser for StubParser {
                     basis: vec![],
                     evidence_refs: vec!["stub-call-001".to_string()],
                 }],
+                extensions: None,
             },
         })
     }
