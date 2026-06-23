@@ -3,9 +3,8 @@ use std::process;
 
 use clap::{Parser, Subcommand};
 use tgraphy_core::component::ComponentRegistry;
-use tgraphy_core::component::builtin::{
-    BuiltinEvaluator, BuiltinParser, BuiltinReporter, RustParser,
-};
+use tgraphy_core::component::builtin::{BuiltinEvaluator, BuiltinParser, BuiltinReporter};
+use tgraphy_core::component::process::{ProcessConfig, ProcessParser};
 use tgraphy_core::pipeline::{
     PipelineError, collect_step, evaluate_step, report_step, transform_step,
 };
@@ -55,10 +54,27 @@ enum Command {
     },
 }
 
+fn rust_parser_command() -> String {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|dir| dir.join("tgraphy-parser-rust")))
+        .unwrap_or_else(|| PathBuf::from("tgraphy-parser-rust"))
+        .to_string_lossy()
+        .into_owned()
+}
+
 fn default_registry() -> ComponentRegistry {
     let mut registry = ComponentRegistry::new();
     registry.register_parser("builtin", Box::new(BuiltinParser));
-    registry.register_parser("rust", Box::new(RustParser));
+    registry.register_parser(
+        "rust",
+        Box::new(ProcessParser {
+            config: ProcessConfig {
+                command: rust_parser_command(),
+                args: vec![],
+            },
+        }),
+    );
     registry.register_evaluator("builtin", Box::new(BuiltinEvaluator));
     registry.register_reporter("builtin", Box::new(BuiltinReporter));
     registry

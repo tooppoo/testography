@@ -1,0 +1,12 @@
+[package]
+name = "tgraphy-parser-rust"
+version = "0.0.1"
+edition = "2024"
+
+[[bin]]
+name = "tgraphy-parser-rust"
+path = "src/main.rs"
+
+[dependencies]
+tgraphy-core = { path = "../core" }
+serde_json = "1"
