@@ -1,111 +1,16 @@
-use serde::{Deserialize, Serialize};
+use tgraphy_types::{EvaluatorInfo, Finding, FindingSubject};
+
+pub use tgraphy_types::{EvaluatorInput, FindingLayer, FindingLevel, SubjectKind};
 
 const EVALUATOR_ID: &str = "rust-static";
 const EVALUATOR_VERSION: &str = env!("CARGO_PKG_VERSION");
 const RULE_PREDICATE_ONLY: &str = "rust.assert.predicate_only_assertion";
 
-// ── Input types (deserialized from stdin) ────────────────────────────────────
-
-#[derive(Deserialize)]
-pub struct EvaluatorInput {
-    pub evidence: StagedEvidence,
-    #[serde(default)]
-    pub module_bundles: Vec<serde_json::Value>,
-    #[serde(default)]
-    pub assessment_layers: Vec<serde_json::Value>,
-    #[serde(default)]
-    pub config: Option<serde_json::Value>,
-}
-
-#[derive(Deserialize)]
-pub struct StagedEvidence {
-    #[serde(default)]
-    pub test_cases: Vec<TestCase>,
-}
-
-#[derive(Deserialize)]
-pub struct TestCase {
-    pub id: String,
-    #[serde(default)]
-    pub assertions: Vec<Assertion>,
-}
-
-#[derive(Deserialize)]
-pub struct Assertion {
-    pub id: String,
-    pub matcher: Option<Matcher>,
-}
-
-#[derive(Deserialize)]
-pub struct Matcher {
-    pub name: Option<String>,
-}
-
-// ── Output types (serialized to stdout) ──────────────────────────────────────
-
-#[derive(Serialize)]
-pub struct FindingLayer {
-    pub id: String,
-    pub evaluator: EvaluatorInfo,
-    pub findings: Vec<Finding>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub summary: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct EvaluatorInfo {
-    pub id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub version: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct Finding {
-    pub id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub rule_id: Option<String>,
-    pub level: FindingLevel,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub confidence: Option<String>,
-    pub message: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub subjects: Vec<FindingSubject>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub rationale: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum FindingLevel {
-    Info,
-    #[allow(dead_code)]
-    Warning,
-    #[allow(dead_code)]
-    Error,
-}
-
-#[derive(Serialize)]
-pub struct FindingSubject {
-    pub kind: SubjectKind,
-    #[serde(rename = "ref", skip_serializing_if = "Option::is_none")]
-    pub entity_ref: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub path: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SubjectKind {
-    Assertion,
-}
-
-// ── Evaluation logic ──────────────────────────────────────────────────────────
-
 pub fn evaluate(input: EvaluatorInput) -> FindingLayer {
     let mut findings = Vec::new();
 
     for test_case in &input.evidence.test_cases {
-        for assertion in &test_case.assertions {
+        for assertion in test_case.assertions.as_deref().unwrap_or(&[]) {
             let is_plain_assert =
                 assertion.matcher.as_ref().and_then(|m| m.name.as_deref()) == Some("assert");
 
