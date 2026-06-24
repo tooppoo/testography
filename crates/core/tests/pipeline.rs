@@ -280,6 +280,67 @@ fn transform_fails_with_io_error_for_missing_input() {
     );
 }
 
+#[test]
+fn transform_rejects_legacy_assessed_artifact_with_stage_error() {
+    let input = fixture("valid_assessed.json");
+    let output = temp_path("transform_reject_assessed.json");
+
+    let result = transform_step(&input, &output);
+    assert!(
+        matches!(
+            result,
+            Err(PipelineError::UnexpectedArtifactType {
+                found: "assessed_artifact",
+                ..
+            })
+        ),
+        "transform should reject assessed_artifact with UnexpectedArtifactType: {:?}",
+        result
+    );
+
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn transform_rejects_invalid_json_with_validation_error() {
+    let input = temp_path("transform_invalid_json.json");
+    let output = temp_path("transform_invalid_json_out.json");
+
+    std::fs::write(&input, b"not valid json").unwrap();
+
+    let result = transform_step(&input, &output);
+    assert!(
+        matches!(result, Err(PipelineError::ArtifactValidation(_))),
+        "invalid JSON should return ArtifactValidation error, not UnexpectedArtifactType: {:?}",
+        result
+    );
+
+    let _ = std::fs::remove_file(&input);
+    let _ = std::fs::remove_file(&output);
+}
+
+#[test]
+fn transform_rejects_unknown_artifact_type_with_validation_error() {
+    let input = temp_path("transform_unknown_type.json");
+    let output = temp_path("transform_unknown_type_out.json");
+
+    std::fs::write(
+        &input,
+        br#"{"schema_version":"0.0.1","artifact_type":"unknown_type","evidence":{}}"#,
+    )
+    .unwrap();
+
+    let result = transform_step(&input, &output);
+    assert!(
+        matches!(result, Err(PipelineError::ArtifactValidation(_))),
+        "unknown artifact type should return ArtifactValidation error: {:?}",
+        result
+    );
+
+    let _ = std::fs::remove_file(&input);
+    let _ = std::fs::remove_file(&output);
+}
+
 // ── transform step: algorithm behaviour ──────────────────────────────────────
 
 #[test]
