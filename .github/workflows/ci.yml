@@ -70,4 +70,11 @@ jobs:
           target/release/tgraphy collect \
             --parser rust \
             --input ./crates/core/tests/artifact.rs \
-            --output ./tmp/result.json
+            --output ./tmp/parsed.json
+          target/release/tgraphy transform \
+            --input ./tmp/parsed.json \
+            --output ./tmp/moduled.json
+          target/release/tgraphy evaluate \
+            --evaluator rust-static \
+            --input ./tmp/moduled.json \
+            --output ./tmp/evaluated.json
