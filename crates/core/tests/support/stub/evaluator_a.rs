@@ -15,7 +15,9 @@ impl Evaluator for StubEvaluatorA {
             },
             findings: vec![Finding {
                 id: "stub-finding-a-001".to_string(),
+                rule_id: None,
                 level: FindingLevel::Info,
+                confidence: None,
                 message: "stub finding from evaluator a".to_string(),
                 subjects: vec![],
                 rationale: None,

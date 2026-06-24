@@ -99,6 +99,7 @@ pub enum SubjectKind {
     TestCase,
     Module,
     TestModuleLink,
+    Assertion,
 }
 
 /// A reference to a specific entity within the artifact that a finding concerns.
@@ -115,7 +116,11 @@ pub struct FindingSubject {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Finding {
     pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rule_id: Option<String>,
     pub level: FindingLevel,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub confidence: Option<String>,
     pub message: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub subjects: Vec<FindingSubject>,

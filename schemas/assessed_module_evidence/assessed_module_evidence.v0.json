@@ -88,11 +88,23 @@
                 "id": {
                     "$ref": "#/$defs/id"
                 },
+                "rule_id": {
+                    "minLength": 1,
+                    "type": "string"
+                },
                 "level": {
                     "enum": [
                         "info",
                         "warning",
                         "error"
+                    ]
+                },
+                "confidence": {
+                    "enum": [
+                        "high",
+                        "medium",
+                        "low",
+                        "unknown"
                     ]
                 },
                 "message": {
@@ -124,7 +136,8 @@
                         "artifact",
                         "test_case",
                         "module",
-                        "test_module_link"
+                        "test_module_link",
+                        "assertion"
                     ]
                 },
                 "ref": {

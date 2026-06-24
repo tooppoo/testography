@@ -226,6 +226,8 @@ struct StagedEvidenceIds {
     link_ids: HashSet<String>,
     /// Call IDs only — used to validate `call_ref` and `target_call_refs`.
     call_ids: HashSet<String>,
+    /// Assertion IDs only — used to validate `finding_subject.ref` when kind = assertion.
+    assertion_ids: HashSet<String>,
     /// All granular item IDs (calls, parameters, assertions) — used for `evidence_refs`.
     evidence_item_ids: HashSet<String>,
 }
@@ -236,6 +238,7 @@ impl StagedEvidenceIds {
         let mut module_ids = HashSet::new();
         let mut link_ids = HashSet::new();
         let mut call_ids = HashSet::new();
+        let mut assertion_ids = HashSet::new();
         let mut evidence_item_ids = HashSet::new();
         let mut violations = vec![];
 
@@ -264,6 +267,7 @@ impl StagedEvidenceIds {
                         id: assertion.id.clone(),
                     });
                 }
+                assertion_ids.insert(assertion.id.clone());
             }
         }
 
@@ -288,6 +292,7 @@ impl StagedEvidenceIds {
             module_ids,
             link_ids,
             call_ids,
+            assertion_ids,
             evidence_item_ids,
         };
 
@@ -593,6 +598,14 @@ fn validate_finding_subject_refs(
                     }
                     (SubjectKind::TestModuleLink, Some(r)) => {
                         if !ids.link_ids.contains(r.as_str()) {
+                            violations.push(ReferenceViolation::BrokenRef {
+                                field: "finding_subject.ref".to_string(),
+                                id: r.clone(),
+                            });
+                        }
+                    }
+                    (SubjectKind::Assertion, Some(r)) => {
+                        if !ids.assertion_ids.contains(r.as_str()) {
                             violations.push(ReferenceViolation::BrokenRef {
                                 field: "finding_subject.ref".to_string(),
                                 id: r.clone(),
