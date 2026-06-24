@@ -1047,6 +1047,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tgraphy-evaluator-rust-static"
+version = "0.0.1"
+dependencies = [
+ "jsonschema",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "tgraphy-parser-rust"
 version = "0.0.1"
 dependencies = [

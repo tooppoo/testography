@@ -5,4 +5,10 @@ components {
       args
     }
   }
+  evaluator "rust-static" {
+    process {
+      command "./target/release/tgraphy-evaluator-rust-static"
+      args
+    }
+  }
 }

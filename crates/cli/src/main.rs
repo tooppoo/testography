@@ -3,9 +3,7 @@ use std::process;
 
 use clap::{Parser, Subcommand};
 use tgraphy_core::component::ComponentRegistry;
-use tgraphy_core::component::builtin::{
-    BuiltinEvaluator, BuiltinParser, BuiltinReporter, RustStaticEvaluator,
-};
+use tgraphy_core::component::builtin::{BuiltinEvaluator, BuiltinParser, BuiltinReporter};
 use tgraphy_core::pipeline::{collect_step, evaluate_step, report_step, transform_step};
 
 mod config;
@@ -59,7 +57,6 @@ fn build_registry() -> Result<ComponentRegistry, config::ConfigError> {
     let mut registry = ComponentRegistry::new();
     registry.register_parser("builtin", Box::new(BuiltinParser));
     registry.register_evaluator("builtin", Box::new(BuiltinEvaluator));
-    registry.register_evaluator("rust-static", Box::new(RustStaticEvaluator));
     registry.register_reporter("builtin", Box::new(BuiltinReporter));
 
     if let Some(root) = config::find_worktree_root() {

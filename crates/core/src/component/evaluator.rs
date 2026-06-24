@@ -1,7 +1,10 @@
+use serde::{Deserialize, Serialize};
+
 use crate::artifact::staged::{FindingLayer, StagedEvidence, StagedModuleBundle};
 
 use super::ComponentResult;
 
+#[derive(Serialize, Deserialize)]
 pub struct EvaluatorInput {
     pub evidence: StagedEvidence,
     pub module_bundles: Vec<StagedModuleBundle>,
