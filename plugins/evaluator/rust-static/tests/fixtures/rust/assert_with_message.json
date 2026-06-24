@@ -1,0 +1,37 @@
+{
+    "schema_version": "0.0.1",
+    "artifact_type": "module_evidence",
+    "evidence": {
+        "test_cases": [
+            {
+                "id": "rust-test-0001",
+                "name": "test_value_with_diagnostic_message",
+                "source": {
+                    "file": "src/math.rs",
+                    "language": "rust"
+                },
+                "assertions": [
+                    {
+                        "id": "rust-assertion-0001",
+                        "style": "assert_function",
+                        "matcher": {
+                            "name": "assert"
+                        },
+                        "target_expression": "is_positive(x)"
+                    }
+                ]
+            }
+        ],
+        "modules": [],
+        "test_module_links": []
+    },
+    "module_bundles": [],
+    "lineage": {
+        "kind": "derived_from",
+        "input_artifact_type": "parsed_evidence",
+        "input_producer": {
+            "name": "module-bundle-transform",
+            "kind": "transform"
+        }
+    }
+}

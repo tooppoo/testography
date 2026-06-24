@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use kdl::KdlDocument;
 use tgraphy_core::component::ComponentRegistry;
-use tgraphy_core::component::process::{ProcessConfig, ProcessParser};
+use tgraphy_core::component::process::{ProcessConfig, ProcessEvaluator, ProcessParser};
 
 #[derive(Debug)]
 pub enum ConfigError {
@@ -56,6 +56,7 @@ pub fn register_from_config(
         .map_err(|e: kdl::KdlError| ConfigError::InvalidKdl(e.to_string()))?;
 
     let mut parser_names: HashSet<String> = HashSet::new();
+    let mut evaluator_names: HashSet<String> = HashSet::new();
 
     for components_node in doc
         .nodes()
@@ -91,6 +92,37 @@ pub fn register_from_config(
                 registry.register_parser(
                     &name,
                     Box::new(ProcessParser {
+                        config: ProcessConfig {
+                            command,
+                            args: process.args,
+                        },
+                    }),
+                );
+            } else if kind == "evaluator" {
+                let name = node
+                    .entries()
+                    .first()
+                    .and_then(|e| e.value().as_string())
+                    .ok_or_else(|| {
+                        ConfigError::InvalidKdl(
+                            "evaluator node requires a name argument".to_string(),
+                        )
+                    })?
+                    .to_string();
+
+                if !evaluator_names.insert(name.clone()) {
+                    return Err(ConfigError::DuplicateName {
+                        kind: "evaluator".to_string(),
+                        name,
+                    });
+                }
+
+                let process = parse_process_block(node, "evaluator", &name)?;
+                let command = resolve_command(worktree_root, process.command);
+
+                registry.register_evaluator(
+                    &name,
+                    Box::new(ProcessEvaluator {
                         config: ProcessConfig {
                             command,
                             args: process.args,
@@ -384,6 +416,75 @@ components {
         assert!(
             matches!(&err, ConfigError::DuplicateName { kind, name } if kind == "parser" && name == "rust"),
             "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn registers_process_evaluator_from_config() {
+        let dir = make_config_dir(
+            r#"components {
+  evaluator "rust-static" {
+    process {
+      command "./target/release/tgraphy-evaluator-rust-static"
+      args
+    }
+  }
+}"#,
+        );
+
+        let mut registry = ComponentRegistry::new();
+        register_from_config(&mut registry, dir.path()).expect("load config");
+
+        assert!(
+            registry.resolve_evaluator("rust-static").is_ok(),
+            "rust-static evaluator should be registered"
+        );
+    }
+
+    #[test]
+    fn duplicate_evaluator_name_is_error() {
+        let dir = make_config_dir(
+            r#"components {
+  evaluator "rust-static" {
+    process { command "./a" args }
+  }
+  evaluator "rust-static" {
+    process { command "./b" args }
+  }
+}"#,
+        );
+
+        let mut registry = ComponentRegistry::new();
+        let err = register_from_config(&mut registry, dir.path()).expect_err("should error");
+        assert!(
+            matches!(&err, ConfigError::DuplicateName { kind, name } if kind == "evaluator" && name == "rust-static"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn parser_and_evaluator_registered_from_same_components_block() {
+        let dir = make_config_dir(
+            r#"components {
+  parser "rust" {
+    process { command "/usr/bin/rust-parser" args }
+  }
+  evaluator "rust-static" {
+    process { command "/usr/bin/rust-static-evaluator" args }
+  }
+}"#,
+        );
+
+        let mut registry = ComponentRegistry::new();
+        register_from_config(&mut registry, dir.path()).expect("load config");
+
+        assert!(
+            registry.resolve_parser("rust").is_ok(),
+            "rust parser should be registered"
+        );
+        assert!(
+            registry.resolve_evaluator("rust-static").is_ok(),
+            "rust-static evaluator should be registered"
         );
     }
 }

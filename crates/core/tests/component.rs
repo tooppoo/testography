@@ -248,15 +248,66 @@ fn process_parser_returns_parsed_evidence_for_valid_output() {
 }
 
 #[test]
-fn process_evaluator_returns_structured_failure() {
+fn process_evaluator_returns_error_for_missing_command() {
     let evaluator = ProcessEvaluator {
         config: process_config("nonexistent-command"),
     };
     let result = Evaluator::evaluate(&evaluator, minimal_evaluator_input());
     assert!(
         matches!(result, Err(ComponentError::InternalError { .. })),
-        "process evaluator should return InternalError before execution is implemented"
+        "missing command should return InternalError"
     );
+}
+
+#[test]
+fn process_evaluator_returns_error_for_non_zero_exit() {
+    let evaluator = ProcessEvaluator {
+        config: ProcessConfig {
+            command: "sh".to_string(),
+            args: vec!["-c".to_string(), "exit 1".to_string()],
+        },
+    };
+    let result = Evaluator::evaluate(&evaluator, minimal_evaluator_input());
+    assert!(
+        matches!(result, Err(ComponentError::InternalError { .. })),
+        "non-zero exit should return InternalError"
+    );
+}
+
+#[test]
+fn process_evaluator_returns_error_for_invalid_json_output() {
+    let evaluator = ProcessEvaluator {
+        config: ProcessConfig {
+            command: "sh".to_string(),
+            args: vec![
+                "-c".to_string(),
+                "cat > /dev/null; echo 'not json'".to_string(),
+            ],
+        },
+    };
+    let result = Evaluator::evaluate(&evaluator, minimal_evaluator_input());
+    assert!(
+        matches!(result, Err(ComponentError::InternalError { .. })),
+        "invalid JSON output should return InternalError"
+    );
+}
+
+#[test]
+fn process_evaluator_returns_finding_layer_for_valid_output() {
+    let layer_json = r#"{"id":"layer-1","evaluator":{"id":"test-eval"},"findings":[]}"#;
+    let cmd = format!("cat > /dev/null; printf '%s' '{}'", layer_json);
+    let evaluator = ProcessEvaluator {
+        config: ProcessConfig {
+            command: "sh".to_string(),
+            args: vec!["-c".to_string(), cmd],
+        },
+    };
+    let result = Evaluator::evaluate(&evaluator, minimal_evaluator_input());
+    assert!(
+        result.is_ok(),
+        "valid JSON output should succeed: {result:?}"
+    );
+    assert_eq!(result.unwrap().id, "layer-1");
 }
 
 #[test]

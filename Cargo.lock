@@ -1043,7 +1043,17 @@ dependencies = [
  "jsonschema",
  "serde",
  "serde_json",
+ "tgraphy-types",
  "thiserror",
+]
+
+[[package]]
+name = "tgraphy-evaluator-rust-static"
+version = "0.0.1"
+dependencies = [
+ "jsonschema",
+ "serde_json",
+ "tgraphy-types",
 ]
 
 [[package]]
@@ -1052,9 +1062,17 @@ version = "0.0.1"
 dependencies = [
  "jsonschema",
  "quote",
- "serde",
  "serde_json",
  "syn",
+ "tgraphy-types",
+]
+
+[[package]]
+name = "tgraphy-types"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

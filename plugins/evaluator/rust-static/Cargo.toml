@@ -1,17 +1,15 @@
 [package]
-name = "tgraphy-parser-rust"
+name = "tgraphy-evaluator-rust-static"
 version = "0.0.1"
 edition = "2024"
 
 [[bin]]
-name = "tgraphy-parser-rust"
+name = "tgraphy-evaluator-rust-static"
 path = "src/main.rs"
 
 [dependencies]
 tgraphy-types = { path = "../../../crates/types" }
-quote = "1"
 serde_json = "1"
-syn = { version = "2", features = ["full"] }
 
 [dev-dependencies]
 jsonschema = "0.26"
