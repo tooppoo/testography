@@ -235,3 +235,72 @@ fn chaining_input_deserializes_and_produces_finding() {
     assert_eq!(layer.findings.len(), 1, "chaining input has one assert!()");
     assert_eq!(layer.evaluator.id, "rust-static");
 }
+
+// ── regression: assert! with expected field ───────────────────────────────────
+
+#[test]
+fn assert_with_expected_does_not_produce_finding() {
+    let layer = evaluate(load_input("assert_with_expected.json"));
+    assert_eq!(
+        layer.findings.len(),
+        0,
+        "assert! with an expected field set should not produce a predicate-only finding"
+    );
+}
+
+// ── layer identity ────────────────────────────────────────────────────────────
+
+#[test]
+fn layer_id_first_run_is_evaluator_id_indexed_at_zero() {
+    let layer = evaluate(load_input("assert_predicate_only.json"));
+    assert_eq!(
+        layer.id, "rust-static-0",
+        "first run (no prior rust-static layers) should produce id 'rust-static-0'"
+    );
+}
+
+#[test]
+fn layer_id_does_not_collide_with_existing_layer_ids() {
+    let input = load_input("chaining_input.json");
+    let existing_ids: Vec<String> = input
+        .assessment_layers
+        .iter()
+        .map(|l| l.id.clone())
+        .collect();
+    let layer = evaluate(input);
+    assert!(
+        !existing_ids.iter().any(|id| id == &layer.id),
+        "new layer id '{}' must not collide with existing ids: {:?}",
+        layer.id,
+        existing_ids
+    );
+}
+
+#[test]
+fn layer_id_increments_when_same_evaluator_ran_before() {
+    let layer = evaluate(load_input("rerun_input.json"));
+    assert_eq!(
+        layer.id, "rust-static-1",
+        "second run (one prior rust-static-0 layer) should produce id 'rust-static-1'"
+    );
+}
+
+#[test]
+fn layer_id_skips_index_occupied_by_foreign_evaluator() {
+    // "rust-static-0" exists but belongs to a different evaluator — must not reuse it
+    let layer = evaluate(load_input("foreign_id_conflict_input.json"));
+    assert_eq!(
+        layer.id, "rust-static-1",
+        "rust-static-0 is taken by another evaluator; next available id is rust-static-1"
+    );
+}
+
+#[test]
+fn layer_id_fills_gap_when_zero_index_is_free() {
+    // only "rust-static-1" exists — the gap at index 0 should be filled
+    let layer = evaluate(load_input("gap_fill_input.json"));
+    assert_eq!(
+        layer.id, "rust-static-0",
+        "rust-static-0 is free even though rust-static-1 exists; gap should be filled"
+    );
+}

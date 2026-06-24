@@ -11,8 +11,9 @@ pub fn evaluate(input: EvaluatorInput) -> FindingLayer {
 
     for test_case in &input.evidence.test_cases {
         for assertion in test_case.assertions.as_deref().unwrap_or(&[]) {
-            let is_plain_assert =
-                assertion.matcher.as_ref().and_then(|m| m.name.as_deref()) == Some("assert");
+            let is_plain_assert = assertion.matcher.as_ref().and_then(|m| m.name.as_deref())
+                == Some("assert")
+                && assertion.expected.is_none();
 
             if is_plain_assert {
                 findings.push(Finding {
@@ -41,8 +42,18 @@ pub fn evaluate(input: EvaluatorInput) -> FindingLayer {
         }
     }
 
+    let taken: std::collections::HashSet<&str> = input
+        .assessment_layers
+        .iter()
+        .map(|l| l.id.as_str())
+        .collect();
+    let layer_id = (0u64..)
+        .map(|n| format!("{}-{}", EVALUATOR_ID, n))
+        .find(|id| !taken.contains(id.as_str()))
+        .expect("infinite iterator always finds an unused id");
+
     FindingLayer {
-        id: "rust-static-layer".to_string(),
+        id: layer_id,
         evaluator: EvaluatorInfo {
             id: EVALUATOR_ID.to_string(),
             version: Some(EVALUATOR_VERSION.to_string()),
