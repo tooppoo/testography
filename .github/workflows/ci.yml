@@ -78,3 +78,11 @@ jobs:
             --evaluator rust-static \
             --input ./tmp/moduled.json \
             --output ./tmp/evaluated.json
+          target/release/tgraphy report \
+            --reporter json \
+            --input ./tmp/evaluated.json \
+            --output ./tmp/report.json
+          target/release/tgraphy report \
+            --reporter markdown \
+            --input ./tmp/evaluated.json \
+            --output ./tmp/report.md
