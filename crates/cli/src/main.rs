@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 use tgraphy_core::component::ComponentRegistry;
 use tgraphy_core::component::builtin::{BuiltinEvaluator, BuiltinParser, BuiltinReporter};
 use tgraphy_core::pipeline::{collect_step, evaluate_step, report_step, transform_step};
+use tgraphy_core::run_pipeline;
 
 mod config;
 
@@ -51,6 +52,19 @@ enum Command {
         #[arg(long)]
         output: PathBuf,
     },
+    /// Run the full collect → transform → evaluate → report pipeline
+    Run {
+        #[arg(long)]
+        parser: String,
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long = "evaluator", required = true)]
+        evaluators: Vec<String>,
+        #[arg(long)]
+        reporter: String,
+        #[arg(long, default_value = ".testography")]
+        output_dir: PathBuf,
+    },
 }
 
 fn build_registry() -> Result<ComponentRegistry, config::ConfigError> {
@@ -87,6 +101,20 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             input,
             output,
         } => report_step(&registry, &reporter, &input, &output)?,
+        Command::Run {
+            parser,
+            input,
+            evaluators,
+            reporter,
+            output_dir,
+        } => run_pipeline(
+            &registry,
+            &input,
+            &parser,
+            &evaluators,
+            &reporter,
+            &output_dir,
+        )?,
     }
 
     Ok(())

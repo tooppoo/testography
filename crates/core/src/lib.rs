@@ -9,7 +9,7 @@ pub use artifact::{
     LineageProducer, ModuleEvidenceArtifact, ParsedEvidenceArtifact,
 };
 pub use component::{ComponentError, ComponentRegistry, ComponentResult};
-pub use pipeline::PipelineError;
+pub use pipeline::{PipelineError, run_pipeline};
 pub use validation::{ArtifactError, ReferenceViolation, SchemaViolation};
 
 use validation::integrity::{

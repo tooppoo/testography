@@ -27,3 +27,12 @@ pub struct ReporterInput {
     pub artifact: AssessedModuleEvidenceArtifact,
     pub config: Option<serde_json::Value>,
 }
+
+/// Output envelope returned by process-based reporter binaries via stdout.
+///
+/// `extension` must be a non-empty lowercase alphanumeric string (e.g. "md", "json").
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReporterOutput {
+    pub extension: String,
+    pub content: String,
+}

@@ -20,6 +20,7 @@ impl Reporter for BuiltinReporter {
 
         Ok(ReportOutput {
             format: "text".to_string(),
+            extension: "txt".to_string(),
             content: text.into_bytes(),
         })
     }

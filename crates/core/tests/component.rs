@@ -360,7 +360,9 @@ fn process_reporter_returns_stdout_bytes_for_successful_exit() {
             command: "sh".to_string(),
             args: vec![
                 "-c".to_string(),
-                "cat > /dev/null; printf 'hello report'".to_string(),
+                // Process reporters now output a JSON envelope with extension + content.
+                r#"cat > /dev/null; printf '{"extension":"txt","content":"hello report"}'"#
+                    .to_string(),
             ],
         },
     };
@@ -378,4 +380,5 @@ fn process_reporter_returns_stdout_bytes_for_successful_exit() {
     let output = result.unwrap();
     assert_eq!(output.content, b"hello report");
     assert_eq!(output.format, "echo-reporter");
+    assert_eq!(output.extension, "txt");
 }

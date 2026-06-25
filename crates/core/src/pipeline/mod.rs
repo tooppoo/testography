@@ -39,6 +39,25 @@ pub enum PipelineError {
         expected: &'static str,
         found: &'static str,
     },
+
+    #[error(
+        "report-output contract failure: invalid extension {extension:?} from reporter '{reporter}': {message}"
+    )]
+    InvalidReportExtension {
+        reporter: String,
+        extension: String,
+        message: String,
+    },
+
+    #[error("run step '{step}' failed: {source}")]
+    StepFailed {
+        step: &'static str,
+        #[source]
+        source: Box<PipelineError>,
+    },
+
+    #[error("invalid pipeline configuration: {message}")]
+    InvalidPipelineConfig { message: String },
 }
 
 fn map_artifact_error(err: ArtifactError) -> PipelineError {
@@ -314,19 +333,16 @@ pub fn evaluate_step(
     Ok(())
 }
 
-/// Run the report step: read `input` (must be assessed_module_evidence), invoke
-/// the named reporter, and write the rendered output to `output`.
+/// Read `input` (must be assessed_module_evidence), validate its stage, resolve
+/// the named reporter, invoke it, and return the `ReportOutput`.
 ///
-/// Rejects parsed_evidence, module_evidence, evidence, and assessed_artifact as
-/// pipeline stage contract errors.
-pub fn report_step(
+/// This is shared between `report_step` (explicit output path) and
+/// `run_pipeline` (reporter-defined extension path).
+fn invoke_reporter(
     registry: &ComponentRegistry,
     reporter_name: &str,
     input: &Path,
-    output: &Path,
-) -> Result<(), PipelineError> {
-    check_same_path(input, output)?;
-
+) -> Result<crate::component::reporter::ReportOutput, PipelineError> {
     let artifact = read_artifact(input).map_err(map_artifact_error)?;
 
     let assessed = match artifact {
@@ -365,14 +381,126 @@ pub fn report_step(
         .resolve_reporter(reporter_name)
         .map_err(PipelineError::Component)?;
 
-    let report_output = reporter
+    reporter
         .report(ReporterInput {
             artifact: assessed,
             config: None,
         })
-        .map_err(PipelineError::Component)?;
+        .map_err(PipelineError::Component)
+}
 
+/// Run the report step: read `input` (must be assessed_module_evidence), invoke
+/// the named reporter, and write the rendered output to `output`.
+///
+/// Rejects parsed_evidence, module_evidence, evidence, and assessed_artifact as
+/// pipeline stage contract errors.
+pub fn report_step(
+    registry: &ComponentRegistry,
+    reporter_name: &str,
+    input: &Path,
+    output: &Path,
+) -> Result<(), PipelineError> {
+    check_same_path(input, output)?;
+
+    let report_output = invoke_reporter(registry, reporter_name, input)?;
     write_bytes(output, &report_output.content).map_err(map_artifact_error)?;
+
+    Ok(())
+}
+
+// ── extension validation ──────────────────────────────────────────────────────
+
+fn validate_report_extension(ext: &str) -> bool {
+    !ext.is_empty()
+        && ext
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+}
+
+// ── run pipeline ──────────────────────────────────────────────────────────────
+
+fn wrap_step(step: &'static str, err: PipelineError) -> PipelineError {
+    PipelineError::StepFailed {
+        step,
+        source: Box::new(err),
+    }
+}
+
+/// Run the full `collect → transform → evaluate… → report` pipeline.
+///
+/// Intermediate artifacts are written under `output_dir` and are kept on disk
+/// even when a later step fails.  The report output path is derived from the
+/// reporter-defined extension carried in `ReportOutput`.
+///
+/// At least one evaluator name must be supplied; returns
+/// `InvalidPipelineConfig` otherwise.  Each step error is wrapped in
+/// `StepFailed` so the failed step name is always present in the error.
+pub fn run_pipeline(
+    registry: &ComponentRegistry,
+    input: &Path,
+    parser_name: &str,
+    evaluator_names: &[String],
+    reporter_name: &str,
+    output_dir: &Path,
+) -> Result<(), PipelineError> {
+    if evaluator_names.is_empty() {
+        return Err(PipelineError::InvalidPipelineConfig {
+            message: "at least one evaluator is required".to_string(),
+        });
+    }
+
+    std::fs::create_dir_all(output_dir).map_err(PipelineError::Io)?;
+
+    let parsed_evidence_path = output_dir.join("parsed_evidence.json");
+    let module_evidence_path = output_dir.join("module_evidence.json");
+    let assessed_path = output_dir.join("assessed_module_evidence.json");
+    let assessed_tmp_path = output_dir.join("assessed_module_evidence.tmp.json");
+
+    // collect
+    collect_step(registry, parser_name, input, &parsed_evidence_path)
+        .map_err(|e| wrap_step("collect", e))?;
+
+    // transform
+    transform_step(&parsed_evidence_path, &module_evidence_path)
+        .map_err(|e| wrap_step("transform", e))?;
+
+    // evaluate (one or more)
+    for (i, evaluator_name) in evaluator_names.iter().enumerate() {
+        if i == 0 {
+            evaluate_step(
+                registry,
+                evaluator_name,
+                &module_evidence_path,
+                &assessed_path,
+            )
+            .map_err(|e| wrap_step("evaluate", e))?;
+        } else {
+            evaluate_step(registry, evaluator_name, &assessed_path, &assessed_tmp_path)
+                .map_err(|e| wrap_step("evaluate", e))?;
+            std::fs::rename(&assessed_tmp_path, &assessed_path)
+                .map_err(|e| wrap_step("evaluate", PipelineError::Io(e)))?;
+        }
+    }
+
+    // report: delegate read/stage-check/resolve/invoke to invoke_reporter,
+    // then validate the reporter-defined extension and write to the computed path.
+    let report_output = invoke_reporter(registry, reporter_name, &assessed_path)
+        .map_err(|e| wrap_step("report", e))?;
+
+    if !validate_report_extension(&report_output.extension) {
+        return Err(wrap_step(
+            "report",
+            PipelineError::InvalidReportExtension {
+                reporter: reporter_name.to_string(),
+                extension: report_output.extension.clone(),
+                message: "extension must be non-empty and contain only lowercase ASCII alphanumeric characters".to_string(),
+            },
+        ));
+    }
+
+    let report_path = output_dir.join(format!("report.{}", report_output.extension));
+    write_bytes(&report_path, &report_output.content)
+        .map_err(|e| wrap_step("report", map_artifact_error(e)))?;
 
     Ok(())
 }
