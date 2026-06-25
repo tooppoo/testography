@@ -39,6 +39,15 @@ pub enum PipelineError {
         expected: &'static str,
         found: &'static str,
     },
+
+    #[error(
+        "report-output contract failure: invalid extension {extension:?} from reporter '{reporter}': {message}"
+    )]
+    InvalidReportExtension {
+        reporter: String,
+        extension: String,
+        message: String,
+    },
 }
 
 fn map_artifact_error(err: ArtifactError) -> PipelineError {
@@ -373,6 +382,105 @@ pub fn report_step(
         .map_err(PipelineError::Component)?;
 
     write_bytes(output, &report_output.content).map_err(map_artifact_error)?;
+
+    Ok(())
+}
+
+// ── extension validation ──────────────────────────────────────────────────────
+
+fn validate_report_extension(ext: &str) -> bool {
+    !ext.is_empty()
+        && ext
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+}
+
+// ── run pipeline ──────────────────────────────────────────────────────────────
+
+/// Run the full `collect → transform → evaluate… → report` pipeline.
+///
+/// Intermediate artifacts are written under `output_dir` and are kept on disk
+/// even when a later step fails.  The report output path is derived from the
+/// reporter-defined extension carried in `ReportOutput`.
+///
+/// At least one evaluator name must be supplied.
+pub fn run_pipeline(
+    registry: &ComponentRegistry,
+    input: &Path,
+    parser_name: &str,
+    evaluator_names: &[String],
+    reporter_name: &str,
+    output_dir: &Path,
+) -> Result<(), PipelineError> {
+    std::fs::create_dir_all(output_dir).map_err(PipelineError::Io)?;
+
+    let parsed_evidence_path = output_dir.join("parsed_evidence.json");
+    let module_evidence_path = output_dir.join("module_evidence.json");
+    let assessed_path = output_dir.join("assessed_module_evidence.json");
+    let assessed_tmp_path = output_dir.join("assessed_module_evidence.tmp.json");
+
+    // collect
+    collect_step(registry, parser_name, input, &parsed_evidence_path)?;
+
+    // transform
+    transform_step(&parsed_evidence_path, &module_evidence_path)?;
+
+    // evaluate (one or more)
+    for (i, evaluator_name) in evaluator_names.iter().enumerate() {
+        if i == 0 {
+            evaluate_step(
+                registry,
+                evaluator_name,
+                &module_evidence_path,
+                &assessed_path,
+            )?;
+        } else {
+            evaluate_step(registry, evaluator_name, &assessed_path, &assessed_tmp_path)?;
+            std::fs::rename(&assessed_tmp_path, &assessed_path).map_err(PipelineError::Io)?;
+        }
+    }
+
+    // report: read artifact, invoke reporter, validate extension, write output
+    let artifact = read_artifact(&assessed_path).map_err(map_artifact_error)?;
+    let assessed = match artifact {
+        ArtifactKind::AssessedModuleEvidence(a) => a,
+        other => {
+            let found = match other {
+                ArtifactKind::ParsedEvidence(_) => "parsed_evidence",
+                ArtifactKind::ModuleEvidence(_) => "module_evidence",
+                ArtifactKind::Evidence(_) => "evidence",
+                ArtifactKind::Assessed(_) => "assessed_artifact",
+                ArtifactKind::AssessedModuleEvidence(_) => unreachable!(),
+            };
+            return Err(PipelineError::UnexpectedArtifactType {
+                step: "report",
+                expected: "assessed_module_evidence",
+                found,
+            });
+        }
+    };
+
+    let reporter = registry
+        .resolve_reporter(reporter_name)
+        .map_err(PipelineError::Component)?;
+
+    let report_output = reporter
+        .report(ReporterInput {
+            artifact: assessed,
+            config: None,
+        })
+        .map_err(PipelineError::Component)?;
+
+    if !validate_report_extension(&report_output.extension) {
+        return Err(PipelineError::InvalidReportExtension {
+            reporter: reporter_name.to_string(),
+            extension: report_output.extension.clone(),
+            message: "extension must be non-empty and contain only lowercase ASCII alphanumeric characters".to_string(),
+        });
+    }
+
+    let report_path = output_dir.join(format!("report.{}", report_output.extension));
+    write_bytes(&report_path, &report_output.content).map_err(map_artifact_error)?;
 
     Ok(())
 }

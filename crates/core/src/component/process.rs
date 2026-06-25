@@ -1,6 +1,8 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
 
+use tgraphy_types::ReporterOutput as ProcessReporterOutput;
+
 use crate::artifact::ParsedEvidenceArtifact;
 use crate::artifact::staged::FindingLayer;
 
@@ -150,9 +152,18 @@ impl Reporter for ProcessReporter {
             });
         }
 
+        let envelope: ProcessReporterOutput =
+            serde_json::from_slice(&output.stdout).map_err(|e| ComponentError::InvalidOutput {
+                message: format!(
+                    "reporter process '{}' produced invalid output envelope: {e}",
+                    self.config.command
+                ),
+            })?;
+
         Ok(ReportOutput {
             format: self.name.clone(),
-            content: output.stdout,
+            extension: envelope.extension,
+            content: envelope.content.into_bytes(),
         })
     }
 }

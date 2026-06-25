@@ -33,6 +33,7 @@ impl Reporter for StubReporter {
 
         Ok(ReportOutput {
             format: "markdown".to_string(),
+            extension: "md".to_string(),
             content: content.into_bytes(),
         })
     }

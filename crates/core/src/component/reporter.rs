@@ -5,6 +5,9 @@ use super::ComponentResult;
 #[derive(Debug)]
 pub struct ReportOutput {
     pub format: String,
+    /// Reporter-defined output file extension, e.g. "md", "json", "txt".
+    /// Must be non-empty lowercase alphanumeric (no leading dot, no path separators).
+    pub extension: String,
     pub content: Vec<u8>,
 }
 
