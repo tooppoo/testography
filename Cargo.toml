@@ -1,3 +1,3 @@
 [workspace]
-members = ["crates/types", "crates/core", "crates/cli", "plugins/parser/rust", "plugins/evaluator/rust-static"]
+members = ["crates/types", "crates/core", "crates/cli", "plugins/parser/rust", "plugins/evaluator/rust-static", "plugins/reporter/json", "plugins/reporter/markdown"]
 resolver = "2"

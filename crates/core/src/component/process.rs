@@ -109,13 +109,50 @@ impl Evaluator for ProcessEvaluator {
 }
 
 pub struct ProcessReporter {
+    pub name: String,
     pub config: ProcessConfig,
 }
 
 impl Reporter for ProcessReporter {
-    fn report(&self, _input: ReporterInput) -> ComponentResult<ReportOutput> {
-        Err(ComponentError::InternalError {
-            message: "process-based reporter execution is not yet implemented".to_string(),
+    fn report(&self, input: ReporterInput) -> ComponentResult<ReportOutput> {
+        let input_json =
+            serde_json::to_string(&input).map_err(|e| ComponentError::InternalError {
+                message: format!("failed to serialize reporter input: {e}"),
+            })?;
+
+        let output = Command::new(&self.config.command)
+            .args(&self.config.args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .and_then(|mut child| {
+                child
+                    .stdin
+                    .take()
+                    .expect("stdin was piped")
+                    .write_all(input_json.as_bytes())?;
+                child.wait_with_output()
+            })
+            .map_err(|e| ComponentError::InternalError {
+                message: format!(
+                    "failed to run reporter process '{}': {e}",
+                    self.config.command
+                ),
+            })?;
+
+        if !output.status.success() {
+            return Err(ComponentError::InternalError {
+                message: format!(
+                    "reporter process '{}' exited with status {}",
+                    self.config.command, output.status
+                ),
+            });
+        }
+
+        Ok(ReportOutput {
+            format: self.name.clone(),
+            content: output.stdout,
         })
     }
 }

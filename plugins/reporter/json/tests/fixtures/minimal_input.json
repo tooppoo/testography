@@ -1,0 +1,10 @@
+{
+  "artifact": {
+    "schema_version": "0.0.1",
+    "artifact_type": "assessed_module_evidence",
+    "evidence": {},
+    "module_bundles": [],
+    "assessment_layers": []
+  },
+  "config": null
+}

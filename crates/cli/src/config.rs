@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 
 use kdl::KdlDocument;
 use tgraphy_core::component::ComponentRegistry;
-use tgraphy_core::component::process::{ProcessConfig, ProcessEvaluator, ProcessParser};
+use tgraphy_core::component::process::{
+    ProcessConfig, ProcessEvaluator, ProcessParser, ProcessReporter,
+};
 
 #[derive(Debug)]
 pub enum ConfigError {
@@ -57,6 +59,7 @@ pub fn register_from_config(
 
     let mut parser_names: HashSet<String> = HashSet::new();
     let mut evaluator_names: HashSet<String> = HashSet::new();
+    let mut reporter_names: HashSet<String> = HashSet::new();
 
     for components_node in doc
         .nodes()
@@ -123,6 +126,38 @@ pub fn register_from_config(
                 registry.register_evaluator(
                     &name,
                     Box::new(ProcessEvaluator {
+                        config: ProcessConfig {
+                            command,
+                            args: process.args,
+                        },
+                    }),
+                );
+            } else if kind == "reporter" {
+                let name = node
+                    .entries()
+                    .first()
+                    .and_then(|e| e.value().as_string())
+                    .ok_or_else(|| {
+                        ConfigError::InvalidKdl(
+                            "reporter node requires a name argument".to_string(),
+                        )
+                    })?
+                    .to_string();
+
+                if !reporter_names.insert(name.clone()) {
+                    return Err(ConfigError::DuplicateName {
+                        kind: "reporter".to_string(),
+                        name,
+                    });
+                }
+
+                let process = parse_process_block(node, "reporter", &name)?;
+                let command = resolve_command(worktree_root, process.command);
+
+                registry.register_reporter(
+                    &name,
+                    Box::new(ProcessReporter {
+                        name: name.clone(),
                         config: ProcessConfig {
                             command,
                             args: process.args,
@@ -485,6 +520,144 @@ components {
         assert!(
             registry.resolve_evaluator("rust-static").is_ok(),
             "rust-static evaluator should be registered"
+        );
+    }
+
+    #[test]
+    fn registers_process_reporter_from_config() {
+        let dir = make_config_dir(
+            r#"components {
+  reporter "markdown" {
+    process {
+      command "./target/release/tgraphy-reporter-markdown"
+      args
+    }
+  }
+}"#,
+        );
+
+        let mut registry = ComponentRegistry::new();
+        register_from_config(&mut registry, dir.path()).expect("load config");
+
+        assert!(
+            registry.resolve_reporter("markdown").is_ok(),
+            "markdown reporter should be registered"
+        );
+    }
+
+    #[test]
+    fn duplicate_reporter_name_is_error() {
+        let dir = make_config_dir(
+            r#"components {
+  reporter "markdown" {
+    process { command "./a" args }
+  }
+  reporter "markdown" {
+    process { command "./b" args }
+  }
+}"#,
+        );
+
+        let mut registry = ComponentRegistry::new();
+        let err = register_from_config(&mut registry, dir.path()).expect_err("should error");
+        assert!(
+            matches!(&err, ConfigError::DuplicateName { kind, name } if kind == "reporter" && name == "markdown"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn config_reporter_overrides_builtin() {
+        use tgraphy_core::component::builtin::BuiltinReporter;
+
+        let dir = make_config_dir(
+            r#"components {
+  reporter "builtin" {
+    process {
+      command "/usr/bin/my-reporter"
+      args
+    }
+  }
+}"#,
+        );
+
+        let mut registry = ComponentRegistry::new();
+        registry.register_reporter("builtin", Box::new(BuiltinReporter));
+        register_from_config(&mut registry, dir.path()).expect("load config");
+        assert!(registry.resolve_reporter("builtin").is_ok());
+    }
+
+    #[test]
+    fn parser_evaluator_and_reporter_registered_from_same_components_block() {
+        let dir = make_config_dir(
+            r#"components {
+  parser "rust" {
+    process { command "/usr/bin/rust-parser" args }
+  }
+  evaluator "rust-static" {
+    process { command "/usr/bin/rust-static-evaluator" args }
+  }
+  reporter "markdown" {
+    process { command "/usr/bin/tgraphy-reporter-markdown" args }
+  }
+}"#,
+        );
+
+        let mut registry = ComponentRegistry::new();
+        register_from_config(&mut registry, dir.path()).expect("load config");
+
+        assert!(
+            registry.resolve_parser("rust").is_ok(),
+            "rust parser should be registered"
+        );
+        assert!(
+            registry.resolve_evaluator("rust-static").is_ok(),
+            "rust-static evaluator should be registered"
+        );
+        assert!(
+            registry.resolve_reporter("markdown").is_ok(),
+            "markdown reporter should be registered"
+        );
+    }
+
+    #[test]
+    fn duplicate_reporter_name_across_components_blocks_is_error() {
+        let dir = make_config_dir(
+            r#"components {
+  reporter "json" {
+    process { command "/usr/bin/a" args }
+  }
+}
+components {
+  reporter "json" {
+    process { command "/usr/bin/b" args }
+  }
+}"#,
+        );
+
+        let mut registry = ComponentRegistry::new();
+        let err = register_from_config(&mut registry, dir.path()).expect_err("should error");
+        assert!(
+            matches!(&err, ConfigError::DuplicateName { kind, name } if kind == "reporter" && name == "json"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn reporter_missing_name_argument_is_error() {
+        let dir = make_config_dir(
+            r#"components {
+  reporter {
+    process { command "/usr/bin/reporter" args }
+  }
+}"#,
+        );
+
+        let mut registry = ComponentRegistry::new();
+        let err = register_from_config(&mut registry, dir.path()).expect_err("should error");
+        assert!(
+            matches!(err, ConfigError::InvalidKdl(_)),
+            "reporter without name should produce InvalidKdl error: {err}"
         );
     }
 }

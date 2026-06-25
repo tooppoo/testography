@@ -1,12 +1,8 @@
-use crate::artifact::AssessedModuleEvidenceArtifact;
+pub use tgraphy_types::ReporterInput;
 
 use super::ComponentResult;
 
-pub struct ReporterInput {
-    pub artifact: AssessedModuleEvidenceArtifact,
-    pub config: Option<serde_json::Value>,
-}
-
+#[derive(Debug)]
 pub struct ReportOutput {
     pub format: String,
     pub content: Vec<u8>,
