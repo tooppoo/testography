@@ -121,6 +121,7 @@ fn process_reporter_can_be_registered_in_registry() {
     registry.register_reporter(
         "markdown",
         Box::new(ProcessReporter {
+            name: "markdown".to_string(),
             config: process_config("testography-reporter-markdown"),
         }),
     );
@@ -311,8 +312,9 @@ fn process_evaluator_returns_finding_layer_for_valid_output() {
 }
 
 #[test]
-fn process_reporter_returns_structured_failure() {
+fn process_reporter_returns_error_for_missing_command() {
     let reporter = ProcessReporter {
+        name: "test".to_string(),
         config: process_config("nonexistent-command"),
     };
     let result = Reporter::report(
@@ -324,6 +326,56 @@ fn process_reporter_returns_structured_failure() {
     );
     assert!(
         matches!(result, Err(ComponentError::InternalError { .. })),
-        "process reporter should return InternalError before execution is implemented"
+        "missing command should return InternalError"
     );
+}
+
+#[test]
+fn process_reporter_returns_error_for_non_zero_exit() {
+    let reporter = ProcessReporter {
+        name: "test".to_string(),
+        config: ProcessConfig {
+            command: "sh".to_string(),
+            args: vec!["-c".to_string(), "exit 1".to_string()],
+        },
+    };
+    let result = Reporter::report(
+        &reporter,
+        ReporterInput {
+            artifact: minimal_assessed_module_evidence(),
+            config: None,
+        },
+    );
+    assert!(
+        matches!(result, Err(ComponentError::InternalError { .. })),
+        "non-zero exit should return InternalError"
+    );
+}
+
+#[test]
+fn process_reporter_returns_stdout_bytes_for_successful_exit() {
+    let reporter = ProcessReporter {
+        name: "echo-reporter".to_string(),
+        config: ProcessConfig {
+            command: "sh".to_string(),
+            args: vec![
+                "-c".to_string(),
+                "cat > /dev/null; printf 'hello report'".to_string(),
+            ],
+        },
+    };
+    let result = Reporter::report(
+        &reporter,
+        ReporterInput {
+            artifact: minimal_assessed_module_evidence(),
+            config: None,
+        },
+    );
+    assert!(
+        result.is_ok(),
+        "successful process should return Ok: {result:?}"
+    );
+    let output = result.unwrap();
+    assert_eq!(output.content, b"hello report");
+    assert_eq!(output.format, "echo-reporter");
 }

@@ -11,4 +11,16 @@ components {
       args
     }
   }
+  reporter "json" {
+    process {
+      command "./target/release/tgraphy-reporter-json"
+      args
+    }
+  }
+  reporter "markdown" {
+    process {
+      command "./target/release/tgraphy-reporter-markdown"
+      args
+    }
+  }
 }

@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 
 use kdl::KdlDocument;
 use tgraphy_core::component::ComponentRegistry;
-use tgraphy_core::component::process::{ProcessConfig, ProcessEvaluator, ProcessParser};
+use tgraphy_core::component::process::{
+    ProcessConfig, ProcessEvaluator, ProcessParser, ProcessReporter,
+};
 
 #[derive(Debug)]
 pub enum ConfigError {
@@ -57,6 +59,7 @@ pub fn register_from_config(
 
     let mut parser_names: HashSet<String> = HashSet::new();
     let mut evaluator_names: HashSet<String> = HashSet::new();
+    let mut reporter_names: HashSet<String> = HashSet::new();
 
     for components_node in doc
         .nodes()
@@ -123,6 +126,38 @@ pub fn register_from_config(
                 registry.register_evaluator(
                     &name,
                     Box::new(ProcessEvaluator {
+                        config: ProcessConfig {
+                            command,
+                            args: process.args,
+                        },
+                    }),
+                );
+            } else if kind == "reporter" {
+                let name = node
+                    .entries()
+                    .first()
+                    .and_then(|e| e.value().as_string())
+                    .ok_or_else(|| {
+                        ConfigError::InvalidKdl(
+                            "reporter node requires a name argument".to_string(),
+                        )
+                    })?
+                    .to_string();
+
+                if !reporter_names.insert(name.clone()) {
+                    return Err(ConfigError::DuplicateName {
+                        kind: "reporter".to_string(),
+                        name,
+                    });
+                }
+
+                let process = parse_process_block(node, "reporter", &name)?;
+                let command = resolve_command(worktree_root, process.command);
+
+                registry.register_reporter(
+                    &name,
+                    Box::new(ProcessReporter {
+                        name: name.clone(),
                         config: ProcessConfig {
                             command,
                             args: process.args,

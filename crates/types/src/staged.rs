@@ -107,3 +107,12 @@ pub struct ParsedEvidenceArtifact {
     pub artifact_type: String,
     pub evidence: StagedEvidence,
 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AssessedModuleEvidenceArtifact {
+    pub schema_version: String,
+    pub artifact_type: String,
+    pub evidence: StagedEvidence,
+    pub module_bundles: Vec<StagedModuleBundle>,
+    pub assessment_layers: Vec<FindingLayer>,
+}

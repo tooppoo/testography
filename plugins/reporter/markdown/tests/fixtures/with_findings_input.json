@@ -1,0 +1,51 @@
+{
+  "artifact": {
+    "schema_version": "0.0.1",
+    "artifact_type": "assessed_module_evidence",
+    "evidence": {
+      "test_cases": [
+        {
+          "id": "tc-001",
+          "name": "should_compute_sum",
+          "source": { "file": "src/math_test.rs" }
+        }
+      ],
+      "modules": [
+        { "id": "mod-001", "kind": "file", "path": "src/math.rs" }
+      ],
+      "test_module_links": [
+        {
+          "id": "link-001",
+          "test_ref": "tc-001",
+          "module_ref": "mod-001"
+        }
+      ]
+    },
+    "module_bundles": [
+      {
+        "module_ref": "mod-001",
+        "tests": [{ "test_ref": "tc-001", "link_ref": "link-001" }]
+      }
+    ],
+    "assessment_layers": [
+      {
+        "id": "rust-static-0",
+        "evaluator": { "id": "rust-static", "version": "0.0.1" },
+        "findings": [
+          {
+            "id": "rust.assert.predicate_only_assertion:a-001",
+            "rule_id": "rust.assert.predicate_only_assertion",
+            "level": "info",
+            "confidence": "high",
+            "message": "assert!(...) is a predicate-only assertion.",
+            "subjects": [
+              { "kind": "assertion", "ref": "a-001" }
+            ],
+            "rationale": "Use assert_eq! to capture structured evidence."
+          }
+        ]
+      }
+    ]
+  },
+  "config": null
+}

@@ -1068,6 +1068,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tgraphy-reporter-json"
+version = "0.0.1"
+dependencies = [
+ "serde_json",
+ "tgraphy-types",
+]
+
+[[package]]
+name = "tgraphy-reporter-markdown"
+version = "0.0.1"
+dependencies = [
+ "serde_json",
+ "tgraphy-types",
+]
+
+[[package]]
 name = "tgraphy-types"
 version = "0.0.1"
 dependencies = [

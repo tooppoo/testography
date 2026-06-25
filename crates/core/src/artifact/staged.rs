@@ -35,13 +35,3 @@ pub struct ModuleEvidenceArtifact {
     pub module_bundles: Vec<StagedModuleBundle>,
     pub lineage: Lineage,
 }
-
-/// Evaluator output / reporter input: evidence + module bundles + assessment findings.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct AssessedModuleEvidenceArtifact {
-    pub schema_version: String,
-    pub artifact_type: String,
-    pub evidence: StagedEvidence,
-    pub module_bundles: Vec<StagedModuleBundle>,
-    pub assessment_layers: Vec<FindingLayer>,
-}
