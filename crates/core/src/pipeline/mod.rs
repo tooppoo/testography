@@ -477,7 +477,8 @@ pub fn run_pipeline(
         } else {
             evaluate_step(registry, evaluator_name, &assessed_path, &assessed_tmp_path)
                 .map_err(|e| wrap_step("evaluate", e))?;
-            std::fs::rename(&assessed_tmp_path, &assessed_path).map_err(PipelineError::Io)?;
+            std::fs::rename(&assessed_tmp_path, &assessed_path)
+                .map_err(|e| wrap_step("evaluate", PipelineError::Io(e)))?;
         }
     }
 
@@ -487,15 +488,19 @@ pub fn run_pipeline(
         .map_err(|e| wrap_step("report", e))?;
 
     if !validate_report_extension(&report_output.extension) {
-        return Err(PipelineError::InvalidReportExtension {
-            reporter: reporter_name.to_string(),
-            extension: report_output.extension.clone(),
-            message: "extension must be non-empty and contain only lowercase ASCII alphanumeric characters".to_string(),
-        });
+        return Err(wrap_step(
+            "report",
+            PipelineError::InvalidReportExtension {
+                reporter: reporter_name.to_string(),
+                extension: report_output.extension.clone(),
+                message: "extension must be non-empty and contain only lowercase ASCII alphanumeric characters".to_string(),
+            },
+        ));
     }
 
     let report_path = output_dir.join(format!("report.{}", report_output.extension));
-    write_bytes(&report_path, &report_output.content).map_err(map_artifact_error)?;
+    write_bytes(&report_path, &report_output.content)
+        .map_err(|e| wrap_step("report", map_artifact_error(e)))?;
 
     Ok(())
 }

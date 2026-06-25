@@ -315,7 +315,10 @@ fn run_pipeline_rejects_extension_with_leading_dot() {
     let dir = temp_output_dir("ext_leading_dot");
     let result = run_with_extension(&dir, ".md");
     assert!(
-        matches!(result, Err(PipelineError::InvalidReportExtension { .. })),
+        matches!(
+            result,
+            Err(PipelineError::StepFailed { step: "report", .. })
+        ),
         ".md should be invalid: {result:?}"
     );
     let _ = std::fs::remove_dir_all(&dir);
@@ -326,7 +329,10 @@ fn run_pipeline_rejects_empty_extension() {
     let dir = temp_output_dir("ext_empty");
     let result = run_with_extension(&dir, "");
     assert!(
-        matches!(result, Err(PipelineError::InvalidReportExtension { .. })),
+        matches!(
+            result,
+            Err(PipelineError::StepFailed { step: "report", .. })
+        ),
         "empty extension should be invalid: {result:?}"
     );
     let _ = std::fs::remove_dir_all(&dir);
@@ -337,7 +343,10 @@ fn run_pipeline_rejects_extension_with_slash() {
     let dir = temp_output_dir("ext_slash");
     let result = run_with_extension(&dir, "a/b");
     assert!(
-        matches!(result, Err(PipelineError::InvalidReportExtension { .. })),
+        matches!(
+            result,
+            Err(PipelineError::StepFailed { step: "report", .. })
+        ),
         "a/b should be invalid: {result:?}"
     );
     let _ = std::fs::remove_dir_all(&dir);
@@ -348,7 +357,10 @@ fn run_pipeline_rejects_extension_with_backslash() {
     let dir = temp_output_dir("ext_backslash");
     let result = run_with_extension(&dir, "a\\b");
     assert!(
-        matches!(result, Err(PipelineError::InvalidReportExtension { .. })),
+        matches!(
+            result,
+            Err(PipelineError::StepFailed { step: "report", .. })
+        ),
         "a\\\\b should be invalid: {result:?}"
     );
     let _ = std::fs::remove_dir_all(&dir);
@@ -359,7 +371,10 @@ fn run_pipeline_rejects_extension_with_traversal() {
     let dir = temp_output_dir("ext_traversal");
     let result = run_with_extension(&dir, "../x");
     assert!(
-        matches!(result, Err(PipelineError::InvalidReportExtension { .. })),
+        matches!(
+            result,
+            Err(PipelineError::StepFailed { step: "report", .. })
+        ),
         "../x should be invalid: {result:?}"
     );
     let _ = std::fs::remove_dir_all(&dir);
@@ -370,7 +385,10 @@ fn run_pipeline_rejects_extension_that_looks_like_filename() {
     let dir = temp_output_dir("ext_filename");
     let result = run_with_extension(&dir, "report.md");
     assert!(
-        matches!(result, Err(PipelineError::InvalidReportExtension { .. })),
+        matches!(
+            result,
+            Err(PipelineError::StepFailed { step: "report", .. })
+        ),
         "report.md should be invalid (extension only, not filename): {result:?}"
     );
     let _ = std::fs::remove_dir_all(&dir);
@@ -382,10 +400,17 @@ fn run_pipeline_invalid_extension_error_is_distinct_from_other_errors() {
     let result = run_with_extension(&dir, ".md");
     assert!(matches!(
         result,
-        Err(PipelineError::InvalidReportExtension { .. })
+        Err(PipelineError::StepFailed { step: "report", .. })
     ));
-    assert!(!matches!(result, Err(PipelineError::ArtifactValidation(_))));
-    assert!(!matches!(result, Err(PipelineError::Component(_))));
+    assert!(matches!(
+        inner_error(&result),
+        PipelineError::InvalidReportExtension { .. }
+    ));
+    assert!(!matches!(
+        inner_error(&result),
+        PipelineError::ArtifactValidation(_)
+    ));
+    assert!(!matches!(inner_error(&result), PipelineError::Component(_)));
     let _ = std::fs::remove_dir_all(&dir);
 }
 
