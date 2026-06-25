@@ -391,6 +391,23 @@ fn run_pipeline_invalid_extension_error_is_distinct_from_other_errors() {
 
 // ── failure behavior ──────────────────────────────────────────────────────────
 
+fn assert_step_failed(result: &Result<(), PipelineError>, expected_step: &str) {
+    let Err(PipelineError::StepFailed { step, .. }) = result else {
+        panic!("expected StepFailed error for step '{expected_step}', got: {result:?}");
+    };
+    assert_eq!(
+        *step, expected_step,
+        "expected step '{expected_step}', got '{step}'"
+    );
+}
+
+fn inner_error(result: &Result<(), PipelineError>) -> &PipelineError {
+    let Err(PipelineError::StepFailed { source, .. }) = result else {
+        panic!("expected StepFailed, got: {result:?}");
+    };
+    source.as_ref()
+}
+
 #[test]
 fn run_pipeline_keeps_prior_artifacts_on_evaluator_failure() {
     let dir = temp_output_dir("keep_on_eval_fail");
@@ -408,7 +425,8 @@ fn run_pipeline_keeps_prior_artifacts_on_evaluator_failure() {
         &dir,
     );
 
-    assert!(result.is_err(), "run should fail");
+    assert_step_failed(&result, "evaluate");
+    assert!(matches!(inner_error(&result), PipelineError::Component(_)));
     assert!(
         dir.join("parsed_evidence.json").exists(),
         "parsed_evidence.json should remain"
@@ -442,7 +460,8 @@ fn run_pipeline_keeps_prior_artifacts_on_reporter_failure() {
         &dir,
     );
 
-    assert!(result.is_err(), "run should fail");
+    assert_step_failed(&result, "report");
+    assert!(matches!(inner_error(&result), PipelineError::Component(_)));
     assert!(
         dir.join("parsed_evidence.json").exists(),
         "parsed_evidence.json should remain"
@@ -460,8 +479,8 @@ fn run_pipeline_keeps_prior_artifacts_on_reporter_failure() {
 }
 
 #[test]
-fn run_pipeline_fails_with_component_error_for_unknown_parser() {
-    let dir = temp_output_dir("unknown_parser");
+fn run_pipeline_collect_failure_names_collect_step() {
+    let dir = temp_output_dir("collect_step_name");
     let input = fixture("valid_evidence.json");
     let result = run_pipeline(
         &stub_registry(),
@@ -471,16 +490,17 @@ fn run_pipeline_fails_with_component_error_for_unknown_parser() {
         "stub-reporter",
         &dir,
     );
+    assert_step_failed(&result, "collect");
     assert!(
-        matches!(result, Err(PipelineError::Component(_))),
-        "unknown parser should produce Component error: {result:?}"
+        matches!(inner_error(&result), PipelineError::Component(_)),
+        "inner error should be Component: {result:?}"
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]
-fn run_pipeline_fails_with_component_error_for_unknown_evaluator() {
-    let dir = temp_output_dir("unknown_evaluator");
+fn run_pipeline_evaluate_failure_names_evaluate_step() {
+    let dir = temp_output_dir("evaluate_step_name");
     let input = fixture("valid_evidence.json");
     let result = run_pipeline(
         &stub_registry(),
@@ -490,16 +510,17 @@ fn run_pipeline_fails_with_component_error_for_unknown_evaluator() {
         "stub-reporter",
         &dir,
     );
+    assert_step_failed(&result, "evaluate");
     assert!(
-        matches!(result, Err(PipelineError::Component(_))),
-        "unknown evaluator should produce Component error: {result:?}"
+        matches!(inner_error(&result), PipelineError::Component(_)),
+        "inner error should be Component: {result:?}"
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]
-fn run_pipeline_fails_with_component_error_for_unknown_reporter() {
-    let dir = temp_output_dir("unknown_reporter");
+fn run_pipeline_report_failure_names_report_step() {
+    let dir = temp_output_dir("report_step_name");
     let input = fixture("valid_evidence.json");
     let result = run_pipeline(
         &stub_registry(),
@@ -509,9 +530,53 @@ fn run_pipeline_fails_with_component_error_for_unknown_reporter() {
         "nonexistent-reporter",
         &dir,
     );
+    assert_step_failed(&result, "report");
     assert!(
-        matches!(result, Err(PipelineError::Component(_))),
-        "unknown reporter should produce Component error: {result:?}"
+        matches!(inner_error(&result), PipelineError::Component(_)),
+        "inner error should be Component: {result:?}"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn run_pipeline_step_error_message_includes_step_name_and_inner_class() {
+    let dir = temp_output_dir("error_message");
+    let input = fixture("valid_evidence.json");
+    let result = run_pipeline(
+        &stub_registry(),
+        &input,
+        "nonexistent-parser",
+        &["stub-evaluator-a".to_string()],
+        "stub-reporter",
+        &dir,
+    );
+    let msg = result.unwrap_err().to_string();
+    assert!(
+        msg.contains("collect"),
+        "error message should name the failed step: {msg}"
+    );
+    assert!(
+        msg.contains("component"),
+        "error message should include error class: {msg}"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn run_pipeline_rejects_empty_evaluator_list() {
+    let dir = temp_output_dir("empty_evaluators");
+    let input = fixture("valid_evidence.json");
+    let result = run_pipeline(
+        &stub_registry(),
+        &input,
+        "stub-parser",
+        &[],
+        "stub-reporter",
+        &dir,
+    );
+    assert!(
+        matches!(result, Err(PipelineError::InvalidPipelineConfig { .. })),
+        "empty evaluators should return InvalidPipelineConfig: {result:?}"
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
